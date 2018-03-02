@@ -17,11 +17,22 @@
 
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
+#include "slam.hpp"
 
 #include <cstdint>
 #include <iostream>
 #include <string>
 #include <thread>
+
+
+void onReceive(cluon::data::Envelope data){
+    std::cout << "Hello" << std::endl;
+    std::cout << data.dataType() << std::endl;
+//if (data.dataType() == static_cast<int32_t>(opendlv::proxy::TemperatureReading::ID())) {
+//        opendlv::proxy::TemperatureReading t = cluon::extractMessage<opendlv::proxy::TemperatureReading>(std::move(data));
+}
+
+
 
 int32_t main(int32_t argc, char **argv) {
   int32_t retCode{0};
@@ -35,18 +46,30 @@ int32_t main(int32_t argc, char **argv) {
     uint32_t const ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
     bool const VERBOSE{commandlineArguments.count("verbose") != 0};
 
-    (void)ID;
     (void)VERBOSE;
 
     // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
+    cluon::data::Envelope data;
+    //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
+    Slam slam;
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"])),
-      [](auto){}
+      [&data, &slammer = slam](cluon::data::Envelope &&envelope){
+        onReceive(envelope);
+        slammer.nextContainer(envelope);  
+      }
     };
 
     // Just sleep as this microservice is data driven.
     using namespace std::literals::chrono_literals;
     while (od4.isRunning()) {
       std::this_thread::sleep_for(1s);
+      std::chrono::system_clock::time_point tp;
+      opendlv::logic::perception::Object msg;
+      msg.objectId(0);
+      cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
+      od4.send(msg, sampleTime, ID);
+      
+      std::cout << "See something, say something" << std::endl;
     }
   }
   return retCode;

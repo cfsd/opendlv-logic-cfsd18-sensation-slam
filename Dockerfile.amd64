@@ -13,9 +13,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Part to build opendlv-logic-cfsd18-sensation-slam.
+# Part to build opendlv-logic-cfsd18-sensation-slam. 
 FROM alpine:3.7 as builder
 MAINTAINER Christian Berger "christian.berger@gu.se"
+#Get OS stuff
 RUN apk update && \
     apk --no-cache add \
         cmake \
@@ -24,11 +25,12 @@ RUN apk update && \
         upx \
         git \
         mercurial
-
+#Install libs
 WORKDIR /tmp
 RUN hg clone https://bitbucket.org/eigen/eigen && cd eigen && mkdir build && cd build && cmake .. && make install
 RUN git clone https://github.com/RainerKuemmerle/g2o && cd g2o && mkdir build && cd build && cmake -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF .. && make install
 
+#install Microservice
 ADD . /opt/sources
 WORKDIR /opt/sources
 RUN mkdir build && \
@@ -40,7 +42,7 @@ RUN mkdir build && \
 # Part to deploy opendlv-logic-cfsd18-sensation-slam.
 FROM alpine:3.7
 MAINTAINER Christian Berger "christian.berger@gu.se"
-
+#Start microservice
 WORKDIR /usr/bin
 COPY --from=builder /usr/local/include/g2o/ /usr/include/g2o/
 COPY --from=builder /usr/local/lib/libg2o_* /usr/lib/

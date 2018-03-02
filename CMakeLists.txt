@@ -75,8 +75,8 @@ include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 ################################################################################
-# Gather all object code first to avoid double compilation.
-add_library(${PROJECT_NAME}-core OBJECT ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.cpp)
+# Gather all object code first to avoid double compilation. This needs to be done for all added objects, can become very long?
+add_library(${PROJECT_NAME}-core OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/slam.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/cone.cpp ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.cpp)
 set(LIBRARIES Threads::Threads)
 
 ################################################################################
