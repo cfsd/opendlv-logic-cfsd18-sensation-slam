@@ -22,8 +22,7 @@
 #include "slam.hpp"
 
 Slam::Slam() :
-  m_timeDiffMilliseconds()
-, m_lastTimeStamp()
+  m_lastTimeStamp()
 , m_coneCollector()
 , m_lastObjectId()
 , m_coneMutex()
@@ -32,9 +31,9 @@ Slam::Slam() :
 , m_odometryData()
 //, m_gpsReference()
 , m_map()
-, m_newConeThreshold()
 , m_keyframeTimeStamp()
 {
+  g2o::SparseOptimizer optimizer;
   m_coneCollector = Eigen::MatrixXd::Zero(4,20);
   m_lastObjectId = 0;
   m_odometryData << 0,0,0;
@@ -42,12 +41,13 @@ Slam::Slam() :
 
 void Slam::nextContainer(cluon::data::Envelope data)
 {
-  std::cout << "This is slam slamming" << std::endl;
+  //std::cout << "This is slam slamming" << std::endl;
+  
 
   //#####################Recieve Landmarks###########################
   if (data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDirection::ID())) {
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
-    std::cout << "Recieved Direction" << std::endl;
+    //std::cout << "Recieved Direction" << std::endl;
     //Retrive data and timestamp
     cluon::data::TimeStamp timeStamp = data.sampleTimeStamp();
     auto coneDirection = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
@@ -64,7 +64,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
   }
   if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDistance::ID())){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
-    std::cout << "Recieved Distance" << std::endl;
+    //std::cout << "Recieved Distance" << std::endl;
     cluon::data::TimeStamp timeStamp = data.sampleTimeStamp();
     auto coneDistance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
     uint32_t objectId = coneDistance.objectId();
@@ -94,30 +94,10 @@ void Slam::nextContainer(cluon::data::Envelope data)
   }
 
 
-
-  //When new frame
-     //If candidate do SLAM (euclidian distance for two closest landmarks)
-
-
-
-
-  //Else keep collecting
-
-  /*opendlv::data::environment::Point3 xyz;
-  xyz.setX(x(0));
-  xyz.setY(x(1));
-  xyz.setZ(0);
-  opendlv::data::environment::WGS84Coordinate gpsCurrent = m_gpsReference.transform(xyz);
-  opendlv::logic::sensation::Geolocation geoState;
-  geoState.setLatitude(gpsCurrent.getLatitude());
-  geoState.setLongitude(gpsCurrent.getLongitude());
-  geoState.setHeading(x(5));*/
-
-
 }
 
 bool Slam::CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp){
-    if (((timeStamp.microseconds() - m_lastTimeStamp.microseconds()) < m_timeDiffMilliseconds*1000)){
+    if ((abs(timeStamp.microseconds() - m_lastTimeStamp.microseconds()) < m_timeDiffMilliseconds*1000)){
       m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
       m_lastTimeStamp = timeStamp;
 
@@ -127,9 +107,11 @@ bool Slam::CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp){
       Eigen::MatrixXd extractedCones;
       extractedCones = m_coneCollector.leftCols(m_lastObjectId+1);
       if(extractedCones.cols() > 1){
-      std::cout << "Extracted Cones " << std::endl;
-      std::cout << extractedCones << std::endl;
-      if(isKeyframe(timeStamp)){
+        //std::cout << "Extracted Cones " << std::endl;
+        //std::cout << extractedCones << std::endl;
+        if(isKeyframe(timeStamp)){
+          std::cout << "Extracted Cones " << std::endl;
+          std::cout << extractedCones << std::endl;
           performSLAM(extractedCones);//Thread?
         }
       }
@@ -157,10 +139,15 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     pose = m_odometryData;
   }
-  Eigen::MatrixXd xyCones = conesToGlobal(pose, cones);
-  addConesToMap(xyCones);
-  //addKeyframeToGraph(
-  
+  //Eigen::MatrixXd xyCones = conesToGlobal(pose, cones);
+  //int poseId = addPoseToGraph(pose);
+  std::cout << "adding cones to map" << std::endl;
+  addConesToMap(cones,pose);
+  //localize(); //optimize graph to get an optimized pose reading (might not be necessary)
+  //if(loopClose)
+     //loopClose();
+     //updateMap();
+  sendData();
 }
 
 Eigen::MatrixXd Slam::conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
@@ -176,34 +163,84 @@ Eigen::MatrixXd Slam::conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones)
   return xyCones;
 }
 
-void Slam::addConesToMap(Eigen::MatrixXd cones){
+Eigen::Vector3d Slam::coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
+  Eigen::Vector3d cone = Spherical2Cartesian(cones(0), cones(1), cones(2));
+  cone(0) += pose(0);
+  cone(1) += pose(1);
+  cone(2) = cones(3);
+  return cone;
+}
+
+
+/*
+void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
   for(int i = 0; i<cones.cols(); i++){
-    if(newCone(cones.col(i),0)){
+    if(newCone(cones.col(i),pose)){
        Cone cone = Cone(cones(0,i),cones(1,i),(int)cones(2,i),m_map.size()); //Temp id, think of system later
        m_map.push_back(cone);
     }
   }
 }    
-      
+*/
 
+void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches cones with previous cones and adds newly found cones to map
+  std::lock_guard<std::mutex> lockMap(m_mapMutex);
+  if(m_map.size() ==0){
+    Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(1));
+    Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
+    m_map.push_back(cone);
+    std::cout << "Added the first cone" << std::endl;
+  }
 
-bool Slam::newCone(Eigen::MatrixXd cone, int poseId){//Consider adding only the closest two cones to the map to avoid detecting cones that are not immediately on the track
+  double minDistance = 1000;
+  for(uint32_t i = 0; i<cones.cols(); i++){
+    double distanceToCar = cones(2,i);
+    for(uint32_t j = 0; j<m_map.size(); j++){
+      if(fabs(m_map[j].getProperty() - cones(3,i))<0.0001 || true){
+        Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));   
+        double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1));
+        distance = std::sqrt(distance);
+        std::cout << distance << std::endl;
+        if(distance<m_newConeThreshold){
+	  //addConeToGraph(m_map[j],cones.col(i),poseId);
+          if(distanceToCar>minDistance){//Update current cone to know where in the map we are
+            m_currentConeIndex = j;
+            minDistance = distanceToCar;
+          }
+          break;
+        }
+        if(distanceToCar < m_coneMappingThreshold){
+          Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
+          m_map.push_back(cone);
+          std::cout << "Added a new cone" << std::endl;
+          //addConeToGraph(cone,cones.col(i),poseId);
+        }
+      }
+    }
+  }
+}
+    
+/*
+bool Slam::newCone(Eigen::MatrixXd cone, Eigen::Vector3d pose){//Consider adding only the closest two cones to the map to avoid detecting cones that are not immediately on the track
+  
+  bool newCone = false;
   for(uint32_t i = 0; i<m_map.size(); i++){
     if(fabs(m_map[i].getProperty() - cone(2))<0.0001){
+      newCone = cone(0) < m_coneMappingThreshold;
+      cone = coneToGlobal(pose, cone);   
       double distance = (m_map[i].getX()-cone(0))*(m_map[i].getX()-cone(0))+(m_map[i].getY()-cone(1))*(m_map[i].getY()-cone(1));
       distance = std::sqrt(distance);
       std::cout << poseId << std::endl;
       if(distance<m_newConeThreshold){
 	//AddConeToGraph(m_map[i],poseId);
         return false;
-        
       }
     }
   }
-  return true;
+  return newCone;
 }
-  
+  */
 //Get the new pose
 //Convert cones from local to global coordinate system
 //Add eventual new cones to the global map
@@ -228,6 +265,20 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
                    zData;
   return recievedPoint;
 }
+
+void Slam::sendData()
+{
+  std::cout << "Map has " << m_map.size() << " landmarks" << std::endl;
+  //Send Pose (if it should be sent from here)
+  //for(uint32_t i = m_currentConeIndex; i<m_map.size(); i++){
+    //Loop through the map and send cones as standard messages
+    //m_map[i].getDistance(pose);
+    //m_map[i].getAzimuth(pose);
+    //m_map[i].getProperty();
+  //}
+}
+    
+  
 
 void Slam::setUp()
 {

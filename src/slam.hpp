@@ -20,7 +20,7 @@
 #ifndef SLAM_HPP
 #define SLAM_HPP
 
-
+#include "g2o/core/sparse_optimizer.h"
 #include<Eigen/Dense>
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
@@ -48,10 +48,16 @@ public:
   bool isKeyframe(cluon::data::TimeStamp startTime);
   void performSLAM(Eigen::MatrixXd Cones);
   Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
+  Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
-  void addConesToMap(Eigen::MatrixXd cones);
-  bool newCone(Eigen::MatrixXd cone,int poseId);
-  int32_t m_timeDiffMilliseconds;
+  void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  //bool newCone(Eigen::MatrixXd cone,int poseId);
+  void sendData();
+
+
+
+/*Member variables*/
+  int32_t m_timeDiffMilliseconds = 110;
   cluon::data::TimeStamp m_lastTimeStamp;
   Eigen::MatrixXd m_coneCollector;
   uint32_t m_lastObjectId;
@@ -61,9 +67,11 @@ public:
   Eigen::Vector3d m_odometryData;
   //opendlv::data::environment::WGS84Coordinate m_gpsReference;
   std::vector<Cone> m_map;
-  double m_newConeThreshold;
+  double m_newConeThreshold= 3;
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
+  double m_coneMappingThreshold = 67;
+  int m_currentConeIndex = 0;
   
 
     // Constants for degree transformation
