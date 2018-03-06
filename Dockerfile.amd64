@@ -34,7 +34,7 @@ RUN git clone https://github.com/RainerKuemmerle/g2o && cd g2o && mkdir build &&
 #install Microservice
 ADD . /opt/sources
 WORKDIR /opt/sources
-RUN mkdir build && \
+RUN mkdir -p build && \
     cd build && \
     cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=/tmp/opendlv-logic-cfsd18-sensation-slam-dest .. && \
     make && make test && make install && upx -9 /tmp/opendlv-logic-cfsd18-sensation-slam-dest/bin/opendlv-logic-cfsd18-sensation-slam
@@ -45,9 +45,10 @@ FROM alpine:3.7
 MAINTAINER Christian Berger "christian.berger@gu.se"
 #Start microservice
 WORKDIR /usr/bin
-COPY --from=builder /usr/local/include/g2o/ /usr/include/g2o/
+COPY --from=builder /usr/local/include/ /usr/include/
 COPY --from=builder /usr/local/lib/ /usr/lib/
+COPY --from=builder /usr/lib/ /usr/lib/
 COPY --from=builder /tmp/opendlv-logic-cfsd18-sensation-slam-dest/bin/opendlv-logic-cfsd18-sensation-slam .
-RUN apk update && apk add g++ #This is extremely ugly and needs to be fixed
+#RUN apk update && apk add g++ #This is extremely ugly and needs to be fixed
 CMD ["/usr/bin/opendlv-logic-cfsd18-sensation-slam"]
 
