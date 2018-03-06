@@ -50,6 +50,7 @@ void Slam::setupOptimizer(){
   
   g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
   m_optimizer.setAlgorithm(algorithmType);
+  std::cout << "test test" << std::endl;
 }
 
 void Slam::nextContainer(cluon::data::Envelope data)

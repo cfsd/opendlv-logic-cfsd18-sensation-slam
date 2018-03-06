@@ -72,19 +72,30 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.cpp
 # Add current build directory as include directory as it contains generated files.
 include_directories(SYSTEM ${CMAKE_BINARY_DIR})
 include_directories(SYSTEM ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty)
-include_directories(SYSTEM /usr/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
-link_directories(SYSTEM /usr/lib)#Access g2o
 
 ################################################################################
 # Gather all object code first to avoid double compilation. This needs to be done for all added objects, can become very long? Why is this object and not static which works
+
+################################################################################
+# Including g2o in /usr/include
+include_directories(SYSTEM /usr/include)
+include_directories(SYSTEM /usr/local/include)
+link_directories(SYSTEM /usr/lib) #Access g2o
+link_directories(SYSTEM /usr/local/lib) #Access g2o
+
+
+################################################################################
+# Link libs
+set(LIBRARIES Threads::Threads g2o_core g2o_solver_eigen g2o_types_slam2d g2o_stuff)
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
 add_library(${PROJECT_NAME}-core STATIC ${CMAKE_CURRENT_SOURCE_DIR}/src/slam.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/cone.cpp ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.cpp)
-set(LIBRARIES Threads::Threads)
-#target_include_directories(${PROJECT_NAME}-core SYSTEM $<INSTALL_INTERFACE:/usr/include>)
+
 ################################################################################
 # Create executable.
 add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/${PROJECT_NAME}.cpp) #Creates exe of the main .cpp (more like bin)
-target_link_libraries(${PROJECT_NAME} ${LIBRARIES} g2o_core g2o_solver_eigen g2o_types_slam2d ${PROJECT_NAME}-core) #Links the exe with Libraries like the objects added above and g2o
+target_link_libraries(${PROJECT_NAME} ${PROJECT_NAME}-core ${LIBRARIES}) #Links the exe with Libraries like the objects added above and g2o
 
 ################################################################################
 # Enable unit testing.

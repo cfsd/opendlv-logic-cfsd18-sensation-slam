@@ -21,7 +21,7 @@
 #include "g2o/solvers/eigen/linear_solver_eigen.h"
 #include "slam.hpp"
 #include "cone.hpp"
-#include<Eigen/Dense>
+#include <Eigen/Dense>
 
 #include <cstdint>
 #include <iostream>
