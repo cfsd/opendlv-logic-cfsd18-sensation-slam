@@ -84,7 +84,7 @@ set(LIBRARIES Threads::Threads)
 ################################################################################
 # Create executable.
 add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/src/${PROJECT_NAME}.cpp) #Creates exe of the main .cpp (more like bin)
-target_link_libraries(${PROJECT_NAME} ${LIBRARIES} g2o_core ${PROJECT_NAME}-core) #Links the exe with Libraries like the objects added above and g2o
+target_link_libraries(${PROJECT_NAME} ${LIBRARIES} g2o_core g2o_solver_eigen g2o_types_slam2d ${PROJECT_NAME}-core) #Links the exe with Libraries like the objects added above and g2o
 
 ################################################################################
 # Enable unit testing.

@@ -15,10 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "g2o/core/sparse_optimizer.h"
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
+#include "g2o/solvers/eigen/linear_solver_eigen.h"
 #include "slam.hpp"
-#include "g2o/core/sparse_optimizer.h"
+#include "cone.hpp"
+#include<Eigen/Dense>
 
 #include <cstdint>
 #include <iostream>
@@ -37,16 +40,19 @@ int32_t main(int32_t argc, char **argv) {
   } else {
     //uint32_t const ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
     bool const VERBOSE{commandlineArguments.count("verbose") != 0};
-
-    (void)VERBOSE;
     g2o::SparseOptimizer optimizer;
+    (void)VERBOSE;
     // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
     cluon::data::Envelope data;
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
     Slam slam;
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"])),
-      [&data, &slammer = slam](cluon::data::Envelope &&envelope){
-        slammer.nextContainer(envelope);  
+      [&data, &slammer = slam, &od4session = od4](cluon::data::Envelope &&envelope){
+        slammer.nextContainer(envelope);
+        std::vector<Cone> map = slammer.getCones();
+        //slam.sendCones(map,od4session);
+        //Eigen::Vector3d pose = Slam.getPose();
+        //sendPose(pose,od4session);  
       }
     };
 
@@ -59,3 +65,11 @@ int32_t main(int32_t argc, char **argv) {
   }
   return retCode;
 }
+
+/*void sendCones(std::vector<Cone> map,cluon::OD4Session od4){
+  for(uint32_t i = 0; i<map.size(); i++){
+    Cone cone = map[i];
+    //opendlv
+  }
+}*/
+

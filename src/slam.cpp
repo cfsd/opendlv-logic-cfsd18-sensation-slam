@@ -22,7 +22,8 @@
 #include "slam.hpp"
 
 Slam::Slam() :
-  m_lastTimeStamp()
+  m_optimizer()
+, m_lastTimeStamp()
 , m_coneCollector()
 , m_lastObjectId()
 , m_coneMutex()
@@ -33,10 +34,22 @@ Slam::Slam() :
 , m_map()
 , m_keyframeTimeStamp()
 {
-  g2o::SparseOptimizer optimizer;
+  setupOptimizer();
   m_coneCollector = Eigen::MatrixXd::Zero(4,20);
   m_lastObjectId = 0;
   m_odometryData << 0,0,0;
+}
+
+void Slam::setupOptimizer(){
+
+  typedef g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1> > slamBlockSolver;
+  typedef g2o::LinearSolverEigen<slamBlockSolver::PoseMatrixType> slamLinearSolver;
+  
+  auto linearSolver = g2o::make_unique<slamLinearSolver>();
+  linearSolver->setBlockOrdering(false);
+  
+  g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
+  m_optimizer.setAlgorithm(algorithmType);
 }
 
 void Slam::nextContainer(cluon::data::Envelope data)
@@ -147,7 +160,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   //if(loopClose)
      //loopClose();
      //updateMap();
-  sendData();
+  //sendData();
 }
 
 Eigen::MatrixXd Slam::conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
@@ -197,13 +210,13 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
   for(uint32_t i = 0; i<cones.cols(); i++){
     double distanceToCar = cones(2,i);
     for(uint32_t j = 0; j<m_map.size(); j++){
-      if(fabs(m_map[j].getProperty() - cones(3,i))<0.0001 || true){
+      if(fabs(m_map[j].getProperty() - cones(3,i))<0.0001){
         Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));   
         double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1));
         distance = std::sqrt(distance);
         std::cout << distance << std::endl;
         if(distance<m_newConeThreshold){
-	  //addConeToGraph(m_map[j],cones.col(i),poseId);
+	  //addConeToGraph(m_map[j],cones.col(i));
           if(distanceToCar>minDistance){//Update current cone to know where in the map we are
             m_currentConeIndex = j;
             minDistance = distanceToCar;
@@ -214,7 +227,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
           Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
           m_map.push_back(cone);
           std::cout << "Added a new cone" << std::endl;
-          //addConeToGraph(cone,cones.col(i),poseId);
+          //addConeToGraph(cone,cones.col(i));
         }
       }
     }
@@ -266,7 +279,7 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
   return recievedPoint;
 }
 
-void Slam::sendData()
+std::vector<Cone> Slam::getCones()
 {
   std::cout << "Map has " << m_map.size() << " landmarks" << std::endl;
   //Send Pose (if it should be sent from here)
@@ -276,6 +289,7 @@ void Slam::sendData()
     //m_map[i].getAzimuth(pose);
     //m_map[i].getProperty();
   //}
+  return m_map;
 }
     
   

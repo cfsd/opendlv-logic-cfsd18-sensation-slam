@@ -21,6 +21,15 @@
 #define SLAM_HPP
 
 #include "g2o/core/sparse_optimizer.h"
+#include "g2o/core/block_solver.h"
+#include "g2o/core/factory.h"
+#include "g2o/core/optimization_algorithm_factory.h"
+#include "g2o/core/optimization_algorithm_gauss_newton.h"
+#include "g2o/solvers/eigen/linear_solver_eigen.h"
+#include "g2o/types/slam2d/vertex_se2.h"
+#include "g2o/types/slam2d/vertex_point_xy.h"
+#include "g2o/types/slam2d/edge_se2.h"
+#include "g2o/types/slam2d/edge_se2_pointxy.h"
 #include<Eigen/Dense>
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
@@ -40,9 +49,13 @@ public:
   Slam();
   ~Slam() = default;
   void nextContainer(cluon::data::Envelope data);
+  std::vector<Cone> getCones();
+  Eigen::Vector3d getPose();
+  
 
  private:
   void setUp();
+  void setupOptimizer();
   void tearDown();
   bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
   bool isKeyframe(cluon::data::TimeStamp startTime);
@@ -52,11 +65,11 @@ public:
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
   void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   //bool newCone(Eigen::MatrixXd cone,int poseId);
-  void sendData();
 
 
 
 /*Member variables*/
+  g2o::SparseOptimizer m_optimizer;
   int32_t m_timeDiffMilliseconds = 110;
   cluon::data::TimeStamp m_lastTimeStamp;
   Eigen::MatrixXd m_coneCollector;
