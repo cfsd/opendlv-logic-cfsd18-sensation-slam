@@ -59,11 +59,15 @@ public:
   void tearDown();
   bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
   bool isKeyframe(cluon::data::TimeStamp startTime);
+  void addOdometryMeasurement(Eigen::Vector3d pose);
+  void addPoseToGraph(Eigen::Vector3d pose);
   void performSLAM(Eigen::MatrixXd Cones);
   Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
   void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  void addConeMeasurement(Cone cone, Eigen::Vector3d measurement);
+  void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -85,6 +89,7 @@ public:
   double m_timeBetweenKeyframes = 0.5;
   double m_coneMappingThreshold = 67;
   int m_currentConeIndex = 0;
+  int m_poseId = 1000;
   
 
     // Constants for degree transformation
