@@ -20,6 +20,8 @@
 #ifndef SLAM_HPP
 #define SLAM_HPP
 
+#include <tuple>
+#include <utility>
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/core/block_solver.h"
 #include "g2o/core/factory.h"
@@ -45,12 +47,13 @@ private:
  Slam(Slam &&)      = delete;
  Slam &operator=(const Slam &) = delete;
  Slam &operator=(Slam &&) = delete;
+ typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 public:
   Slam();
   ~Slam() = default;
   void nextContainer(cluon::data::Envelope data);
-  std::vector<Cone> getCones();
-  Eigen::Vector3d getPose();
+  std::pair<bool,std::vector<ConePackage>> getCones();
+  std::pair<bool,opendlv::logic::sensation::Geolocation> getPose();
   
 
  private:
@@ -90,6 +93,9 @@ public:
   double m_coneMappingThreshold = 67;
   int m_currentConeIndex = 0;
   int m_poseId = 1000;
+  uint32_t m_conesPerPacket = 20;
+  bool m_sendConeData = false;
+  bool m_sendPoseData = false;
   
 
     // Constants for degree transformation

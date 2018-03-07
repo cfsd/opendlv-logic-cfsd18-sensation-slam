@@ -24,10 +24,12 @@
 #include <Eigen/Dense>
 
 #include <cstdint>
+#include <tuple>
+#include <utility>
 #include <iostream>
 #include <string>
 #include <thread>
-
+typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 
 int32_t main(int32_t argc, char **argv) {
   int32_t retCode{0};
@@ -38,7 +40,7 @@ int32_t main(int32_t argc, char **argv) {
     std::cerr << "Example: " << argv[0] << " --cid=111" << std::endl;
     retCode = 1;
   } else {
-    //uint32_t const ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
+    uint32_t const ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
     bool const VERBOSE{commandlineArguments.count("verbose") != 0};
     g2o::SparseOptimizer optimizer;
     (void)VERBOSE;
@@ -47,12 +49,18 @@ int32_t main(int32_t argc, char **argv) {
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
     Slam slam;
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"])),
-      [&data, &slammer = slam, &od4session = od4](cluon::data::Envelope &&envelope){
+      [&data, &slammer = slam, &od4session = od4, senderStamp = ID](cluon::data::Envelope &&envelope){
         slammer.nextContainer(envelope);
-        std::vector<Cone> map = slammer.getCones();
-        //slam.sendCones(map,od4session);
-        //Eigen::Vector3d pose = Slam.getPose();
-        //sendPose(pose,od4session);  
+        std::pair<bool,std::vector<ConePackage>> conePacket = slammer.getCones();
+        if(conePacket.first){
+        // slam.sendCones(conePacket.second,od4session,ID);
+        }
+        std::pair<bool,opendlv::logic::sensation::Geolocation> posePacket = slammer.getPose();
+        if(posePacket.first){
+           std::chrono::system_clock::time_point tp;
+           cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
+           od4session.send(posePacket.second,sampleTime,senderStamp);
+        }  
       }
     };
 
@@ -66,10 +74,18 @@ int32_t main(int32_t argc, char **argv) {
   return retCode;
 }
 
-/*void sendCones(std::vector<Cone> map,cluon::OD4Session od4){
-  for(uint32_t i = 0; i<map.size(); i++){
-    Cone cone = map[i];
-    //opendlv
+void sendCones(std::vector<ConePackage> cones,cluon::OD4Session od4, uint32_t const senderStamp){
+  for(uint32_t i = 0; i<cones.size(); i++){
+    std::chrono::system_clock::time_point tp;
+    cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
+    ConePackage cone = cones[i];
+    opendlv::logic::perception::ObjectDirection directionMsg = std::get<0>(cone);
+    od4.send(directionMsg,sampleTime,senderStamp);
+    opendlv::logic::perception::ObjectDistance distanceMsg = std::get<1>(cone);
+    od4.send(distanceMsg,sampleTime,senderStamp);
+    opendlv::logic::perception::ObjectType typeMsg = std::get<2>(cone);
+    od4.send(typeMsg,sampleTime,senderStamp);
   }
-}*/
+}
+
 

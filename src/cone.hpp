@@ -23,30 +23,36 @@
 #include <iostream>
 #include <cmath>
 #include <vector>
-
+#include <Eigen/Dense>
+#include "opendlv-standard-message-set.hpp"
 
 class Cone{
   public:
-    Cone(double x, double y,int property,int id);
+    Cone(double x, double y,int type,int id);
     ~Cone() = default;
+    
+    opendlv::logic::perception::ObjectDirection getDirection(Eigen::Vector3d pose);
+    opendlv::logic::perception::ObjectDistance getDistance(Eigen::Vector3d pose);
+    
     
     double getX();
     double getY();
-    int getProperty();
+    int getType();
     int getId();
     
     void setX(double x);
     void setY(double y);
-    void setProperty(int property);
+    void setType(int type);
     void setId(int id);
 
-    //g2o::pointxy_vertex coneToVertex();
-    //void vertexToCone(vertex);
+
+
   private:
     double m_x;
     double m_y;
-    int m_property;
+    int m_type;
     int m_id;
+    const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;
 
 };
 

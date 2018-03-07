@@ -255,7 +255,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
   for(uint32_t i = 0; i<cones.cols(); i++){
     double distanceToCar = cones(2,i);
     for(uint32_t j = 0; j<m_map.size(); j++){
-      if(fabs(m_map[j].getProperty() - cones(3,i))<0.0001){
+      if(fabs(m_map[j].getType() - cones(3,i))<0.0001){
         Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));   
         double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1));
         distance = std::sqrt(distance);
@@ -324,19 +324,54 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
   return recievedPoint;
 }
 
-std::vector<Cone> Slam::getCones()
+std::pair<bool,std::vector<Slam::ConePackage>> Slam::getCones()
 {
-  std::cout << "Map has " << m_map.size() << " landmarks" << std::endl;
-  //Send Pose (if it should be sent from here)
-  //for(uint32_t i = m_currentConeIndex; i<m_map.size(); i++){
-    //Loop through the map and send cones as standard messages
-    //m_map[i].getDistance(pose);
-    //m_map[i].getAzimuth(pose);
-    //m_map[i].getProperty();
-  //}
-  return m_map;
+  std::vector<ConePackage> v_conePackage;
+  if(!m_sendConeData){
+    return std::pair<bool,std::vector<Slam::ConePackage>>(false,v_conePackage);
+  }
+    Eigen::Vector3d pose;
+  {
+    std::lock_guard<std::mutex> lockSensor(m_sensorMutex); 
+    pose = m_odometryData;
+  }//mapmutex too
+  for(uint32_t i = 0; i<m_conesPerPacket;i++){
+    int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size());
+    opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose);
+    directionMsg.objectId(i);
+    opendlv::logic::perception::ObjectDistance distanceMsg = m_map[index].getDistance(pose);
+    distanceMsg.objectId(i);
+    opendlv::logic::perception::ObjectType typeMsg;
+    typeMsg.type(m_map[index].getType());
+    typeMsg.objectId(i);
+    Slam::ConePackage conePackage = Slam::ConePackage(directionMsg,distanceMsg,typeMsg);
+    v_conePackage.push_back(conePackage);
+  }
+  std::pair<bool,std::vector<Slam::ConePackage>> retVal = std::pair<bool,std::vector<ConePackage>>(true,v_conePackage);
+  m_sendConeData = false;
+  return retVal;
 }
-    
+
+std::pair<bool,opendlv::logic::sensation::Geolocation> Slam::getPose(){
+  opendlv::logic::sensation::Geolocation poseMessage;
+  if(!m_sendPoseData){
+    return std::pair<bool,opendlv::logic::sensation::Geolocation>(false,poseMessage);
+  }
+  return std::pair<bool,opendlv::logic::sensation::Geolocation>(false,poseMessage);
+  /*std::lock_guard<std::mutex> lockSensor(m_sensorMutex); 
+  
+  opendlv::data::environment::Point3 xyz;
+  xyz.setX(m_odometry(0));
+  xyz.setY(m_odometry(1));
+  xyz.setZ(0);
+  opendlv::data::environment::WGS84Coordinate gpsCurrent = m_gpsReference.transform(xyz);
+  poseMessage.Latitude(gpsCurrent.Latitude());
+  poseMessage.Longitude(gpsCurrent.Longitude());
+  poseMessage.Heading(m_odometry(2));
+  m_sendPoseData = false;
+  return std::pair(true,poseMessage);*/
+}
+   
   
 
 void Slam::setUp()

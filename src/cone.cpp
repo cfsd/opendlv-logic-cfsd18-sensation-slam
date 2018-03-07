@@ -19,18 +19,38 @@
 
 #include "cone.hpp"
 
-Cone::Cone(double x, double y,int property,int id):
+Cone::Cone(double x, double y,int type,int id):
   m_x()
 , m_y()
-, m_property()
+, m_type()
 , m_id()
 {
   m_x = x;
   m_y = y;
-  m_property = property;
+  m_type = type;
   m_id = id;
 }
 
+opendlv::logic::perception::ObjectDirection Cone::getDirection(Eigen::Vector3d pose){
+  double x = m_x-pose(0);
+  double y = m_y-pose(1);
+  double heading = pose(2);
+  double azimuthAngle = atan(x/y)*static_cast<double>(RAD2DEG);
+  azimuthAngle = azimuthAngle-heading;
+  opendlv::logic::perception::ObjectDirection direction;
+  direction.zenithAngle(0);
+  direction.azimuthAngle(static_cast<float>(azimuthAngle));
+  return direction;
+}
+
+opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pose){
+  double x = m_x-pose(0);
+  double y = m_y-pose(1);
+  double distance = sqrt(x*x+y*y);
+  opendlv::logic::perception::ObjectDistance msgDistance;
+  msgDistance.distance(static_cast<float>(distance));
+  return msgDistance;
+}
 
 double Cone::getX(){
   return m_x;
@@ -40,8 +60,8 @@ double Cone::getY(){
   return m_y;
 }
 
-int Cone::getProperty(){
-  return m_property;
+int Cone::getType(){
+  return m_type;
 }
 
 int Cone::getId(){
@@ -56,8 +76,8 @@ void Cone::setY(double y){
   m_y = y;
 }
 
-void Cone::setProperty(int property){
-  m_property = property;
+void Cone::setType(int type){
+  m_type = type;
 }
 
 void Cone::setId(int id){
