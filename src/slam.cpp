@@ -144,8 +144,8 @@ void Slam::initializeCollection(){
     m_coneCollector = Eigen::MatrixXd::Zero(4,20);
   }
   //Initialize for next collection
-  std::cout << "Collection done" << std::endl;
-  if(extractedCones.cols() > 1){
+  std::cout << "Collection done" << extractedCones.cols() << std::endl;
+  if(extractedCones.cols() > 0){
     //std::cout << "Extracted Cones " << std::endl;
     //std::cout << extractedCones << std::endl;
     if(isKeyframe(m_lastTimeStamp)){//Can add check to make sure only one process is running at a time
@@ -305,7 +305,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
     std::cout << "Added the first cone" << std::endl;
   }
 
-  double minDistance = 1000;
+  double minDistance = 100;
   for(uint32_t i = 0; i<cones.cols(); i++){//Iterate through local cone objects
     double distanceToCar = cones(2,i);
     for(uint32_t j = 0; j<m_map.size(); j++){ //Iteration through global map
@@ -323,7 +323,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
               m_loopClosing = true; //Only want one full loopclosing
            }
 
-          if(distanceToCar>minDistance){//Update current cone to know where in the map we are
+          if(distanceToCar<minDistance){//Update current cone to know where in the map we are
             m_currentConeIndex = j;
             minDistance = distanceToCar;
 
@@ -366,14 +366,11 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
 std::pair<bool,std::vector<Slam::ConePackage>> Slam::getCones()
 {
   std::vector<ConePackage> v_conePackage;
-<<<<<<< HEAD
-  if(!m_sendConeData){
-    std::cout << m_map.size() << std::endl;
-    return std::pair<bool,std::vector<Slam::ConePackage>>(false,v_conePackage);
-=======
+
   if(!m_sendConeData){ //When do we want to send cones
+
+    std::cout << m_map.size() << std::endl;
     return std::pair<bool,std::vector<Slam::ConePackage>>(false,v_conePackage); //If we do not want to send cones, return this
->>>>>>> a0ad25fa1ecbc103adfb2b1c2c4a9346c174450a
   }
     Eigen::Vector3d pose;
   {

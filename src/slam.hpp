@@ -92,7 +92,7 @@ public:
   Eigen::Vector3d m_odometryData;
   //opendlv::data::environment::WGS84Coordinate m_gpsReference;
   std::vector<Cone> m_map;
-  double m_newConeThreshold= 3;
+  double m_newConeThreshold= 1;
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
   double m_coneMappingThreshold = 67;
