@@ -58,7 +58,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
 {
   //std::cout << "This is slam slamming" << std::endl;
   
-
+  //All the ifs need sender stamp checks to make sure the data is from detectcone
   //#####################Recieve Landmarks###########################
   if (data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDirection::ID())) {
     //std::cout << "Recieved Direction" << std::endl;
@@ -69,15 +69,17 @@ void Slam::nextContainer(cluon::data::Envelope data)
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //Check last timestamp if they are from same message
     //std::cout << "Message Recieved " << std::endl;
+    m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
     m_coneCollector(0,objectId) = coneDirection.azimuthAngle();
     m_coneCollector(1,objectId) = coneDirection.zenithAngle();
     if (m_newFrame){
       m_newFrame = false;
-      //std::cout << "Test 2 " << std::endl;
+      std::cout << "Test 2 " << std::endl;
       std::thread coneCollector (&Slam::initializeCollection,this);
+      coneCollector.detach();
     }
-
   }
+
   if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDistance::ID())){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Distance" << std::endl;
@@ -85,25 +87,30 @@ void Slam::nextContainer(cluon::data::Envelope data)
     auto coneDistance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
     uint32_t objectId = coneDistance.objectId();
     m_coneCollector(2,objectId) = coneDistance.distance();
+    m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
     //Check last timestamp if they are from same message
     //std::cout << "Message Recieved " << std::endl;
     if (m_newFrame){
        m_newFrame = false;
        std::thread coneCollector(&Slam::initializeCollection, this);
+       coneCollector.detach();
     }
   }
+
   if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectType::ID())){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Type" << std::endl;
     m_lastTimeStamp = data.sampleTimeStamp();
     auto coneType = cluon::extractMessage<opendlv::logic::perception::ObjectType>(std::move(data));
     uint32_t objectId = coneType.objectId();
+    m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
     m_coneCollector(3,objectId) = coneType.type();
     //Check last timestamp if they are from same message
     //std::cout << "Message Recieved " << std::endl;
     if (m_newFrame){
       m_newFrame = false;
       std::thread coneCollector (&Slam::initializeCollection,this);
+      coneCollector.detach();
     }
   }
   
@@ -133,14 +140,15 @@ void Slam::initializeCollection(){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     extractedCones = m_coneCollector.leftCols(m_lastObjectId+1);
     m_newFrame = true;
+    m_lastObjectId = 0;
+    m_coneCollector = Eigen::MatrixXd::Zero(4,20);
   }
   //Initialize for next collection
-  m_lastObjectId = 0;
-  m_coneCollector = Eigen::MatrixXd::Zero(4,20);
+  std::cout << "Collection done" << std::endl;
   if(extractedCones.cols() > 1){
     //std::cout << "Extracted Cones " << std::endl;
     //std::cout << extractedCones << std::endl;
-    if(isKeyframe(m_lastTimeStamp)){
+    if(isKeyframe(m_lastTimeStamp)){//Can add check to make sure only one process is running at a time
       std::cout << "Extracted Cones " << std::endl;
       std::cout << extractedCones << std::endl;
       performSLAM(extractedCones);//Thread?
@@ -423,6 +431,7 @@ std::pair<bool,std::vector<Slam::ConePackage>> Slam::getCones()
 {
   std::vector<ConePackage> v_conePackage;
   if(!m_sendConeData){
+    std::cout << m_map.size() << std::endl;
     return std::pair<bool,std::vector<Slam::ConePackage>>(false,v_conePackage);
   }
     Eigen::Vector3d pose;

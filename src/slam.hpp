@@ -101,7 +101,7 @@ public:
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
-  bool m_newFrame = false;
+  bool m_newFrame = true;
   bool m_loopClosing = false;
   
 
