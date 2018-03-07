@@ -63,6 +63,7 @@ public:
   bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
   bool isKeyframe(cluon::data::TimeStamp startTime);
   void addOdometryMeasurement(Eigen::Vector3d pose);
+  void optimizeGraph(g2o::SparseOptimizer &optimizer);
   void addPoseToGraph(Eigen::Vector3d pose);
   void performSLAM(Eigen::MatrixXd Cones);
   Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
@@ -84,6 +85,7 @@ public:
   std::mutex m_coneMutex;
   std::mutex m_sensorMutex;
   std::mutex m_mapMutex;
+  std::mutex m_optimizerMutex;
   Eigen::Vector3d m_odometryData;
   //opendlv::data::environment::WGS84Coordinate m_gpsReference;
   std::vector<Cone> m_map;

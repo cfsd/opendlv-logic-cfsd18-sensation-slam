@@ -29,6 +29,7 @@ Slam::Slam() :
 , m_coneMutex()
 , m_sensorMutex()
 , m_mapMutex()
+, m_optimizerMutex()
 , m_odometryData()
 //, m_gpsReference()
 , m_map()
@@ -168,6 +169,8 @@ void Slam::addPoseToGraph(Eigen::Vector3d pose){
   g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
   poseVertex->setId(m_poseId);
   poseVertex->setEstimate(pose);
+
+  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
   m_optimizer.addVertex(poseVertex);
   addOdometryMeasurement(pose);
   m_poseId++;
@@ -176,6 +179,9 @@ void Slam::addPoseToGraph(Eigen::Vector3d pose){
 void Slam::addOdometryMeasurement(Eigen::Vector3d pose){
   if(m_poseId>1000){
     g2o::EdgeSE2* odometryEdge = new g2o::EdgeSE2;
+
+    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+
     odometryEdge->vertices()[0] = m_optimizer.vertex(m_poseId-1);
     odometryEdge->vertices()[1] = m_optimizer.vertex(m_poseId);
     g2o::VertexSE2* prevVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(m_poseId-1));
@@ -186,6 +192,20 @@ void Slam::addOdometryMeasurement(Eigen::Vector3d pose){
     odometryEdge->setInformation(Eigen::Matrix3d::Identity()*0.01); //Actual covariance should be configured
     m_optimizer.addEdge(odometryEdge);
   }
+}
+
+void Slam::optimizeGraph(g2o::SparseOptimizer &optimizer){
+
+
+  g2o::VertexSE2* firstRobotPose = dynamic_cast<g2o::VertexSE2*>(optimizer.vertex(0));
+  firstRobotPose->setFixed(true);
+  optimizer.setVerbose(true);
+
+  std::cout << "Optimizing" << std::endl;
+  optimizer.initializeOptimization();
+  optimizer.optimize(10); //Add config for amount of iterations
+  std::cout << "Optimizing done." << std::endl;
+
 }
 
 Eigen::MatrixXd Slam::conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
@@ -214,6 +234,9 @@ void Slam::addConeToGraph(Cone cone, Eigen::Vector3d measurement){
   g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
   coneVertex->setId(cone.getId());
   coneVertex->setEstimate(conePose);
+
+  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+
   m_optimizer.addVertex(coneVertex);
   addConeMeasurement(cone, measurement);
 }
@@ -223,6 +246,9 @@ void Slam::addConeMeasurement(Cone cone, Eigen::Vector3d measurement){
   Eigen::Vector3d xyzMeasurement = Spherical2Cartesian(measurement(0),measurement(1),measurement(2));
   Eigen::Vector2d xyMeasurement;
   xyMeasurement << xyzMeasurement(0),xyzMeasurement(1);
+
+  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+
   coneMeasurement->vertices()[0] = m_optimizer.vertex(m_poseId);
   coneMeasurement->vertices()[1] = m_optimizer.vertex(cone.getId());
   coneMeasurement->setMeasurement(xyMeasurement);
@@ -261,7 +287,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
         distance = std::sqrt(distance);
         std::cout << distance << std::endl;
         if(distance<m_newConeThreshold){
-	  addConeMeasurement(m_map[j],cones.col(i));
+	         addConeMeasurement(m_map[j],cones.col(i));
           if(distanceToCar>minDistance){//Update current cone to know where in the map we are
             m_currentConeIndex = j;
             minDistance = distanceToCar;
@@ -273,6 +299,25 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
           m_map.push_back(cone);
           std::cout << "Added a new cone" << std::endl;
           addConeToGraph(cone,cones.col(i));
+
+
+            std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+            optimizeGraph(m_optimizer);
+
+          /* Threading
+
+          std::thread optimizerThread;
+
+          g2o::SparseOptimizer optimizer2Thread;
+
+          {
+            //Only lock in scope
+            std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+            optimizer2Thread = m_optimizer;
+          }
+
+          optimizerThread(optimizeGraph,optimizer2Thread);*/
+
         }
       }
     }
