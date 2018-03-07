@@ -72,6 +72,7 @@ public:
   void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void addConeMeasurement(Cone cone, Eigen::Vector3d measurement);
   void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
+  bool loopClosing(Cone cone);
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -98,6 +99,7 @@ public:
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
+  bool m_loopClosing = false;
   
 
     // Constants for degree transformation
