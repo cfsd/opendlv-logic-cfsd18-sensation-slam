@@ -60,7 +60,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
   
   //All the ifs need sender stamp checks to make sure the data is from detectcone
   //#####################Recieve Landmarks###########################
-  if (data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDirection::ID())) {
+  if (data.dataType() == opendlv::logic::perception::ObjectDirection::ID()) {
     //std::cout << "Recieved Direction" << std::endl;
     //Retrive data and timestamp
     m_lastTimeStamp = data.sampleTimeStamp();
@@ -80,7 +80,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
     }
   }
 
-  if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDistance::ID())){
+  if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Distance" << std::endl;
     m_lastTimeStamp = data.sampleTimeStamp();
@@ -97,7 +97,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
     }
   }
 
-  if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectType::ID())){
+  if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Type" << std::endl;
     m_lastTimeStamp = data.sampleTimeStamp();
@@ -115,7 +115,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
   }
   
   //#########################Recieve Odometry##################################
-  if(data.dataType() == static_cast<int32_t>(opendlv::logic::sensation::Geolocation::ID())){
+  if(data.dataType() == opendlv::logic::sensation::Geolocation::ID()){
    
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     auto odometry = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(data));

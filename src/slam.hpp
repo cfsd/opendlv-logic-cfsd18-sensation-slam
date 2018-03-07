@@ -33,7 +33,7 @@
 #include "g2o/types/slam2d/vertex_point_xy.h"
 #include "g2o/types/slam2d/edge_se2.h"
 #include "g2o/types/slam2d/edge_se2_pointxy.h"
-#include<Eigen/Dense>
+#include <Eigen/Dense>
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
 
