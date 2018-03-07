@@ -325,14 +325,27 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
         std::cout << distance << std::endl;
         if(distance<m_newConeThreshold){
 	         addConeMeasurement(m_map[j],cones.col(i));
+
+           if(loopClosing(m_map[j]) && m_loopClosing == false){
+              std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+              optimizeGraph(m_optimizer);
+              m_loopClosing = true;
+           }
+
           if(distanceToCar>minDistance){//Update current cone to know where in the map we are
             m_currentConeIndex = j;
             minDistance = distanceToCar;
+
+            //Loopcloser
+
+
           }
           break;
         }
         if(distanceToCar < m_coneMappingThreshold){
           Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
+
+          
           m_map.push_back(cone);
           std::cout << "Added a new cone" << std::endl;
           addConeToGraph(cone,cones.col(i));
@@ -452,6 +465,25 @@ std::pair<bool,opendlv::logic::sensation::Geolocation> Slam::getPose(){
   poseMessage.Heading(m_odometryData(2));
   m_sendPoseData = false;
   return std::pair(true,poseMessage);*/
+}
+
+bool Slam::loopClosing(Cone cone){
+
+  /*g2o::VertexSE2* initialPoseVertex = new g2o::VertexSE2;
+  initialPoseVertex = m_optimizer.vertex(1001);
+
+  Eigen::Vector3d initialPose = initialPoseVertex.estimate();*/
+
+  Eigen::Vector2d initialCone;
+  initialCone << m_map[0].getX(),m_map[0].getY();
+  double loopClosingThreshold = std::sqrt( (initialCone(0)-cone.getX())*(initialCone(0)-cone.getX()) + (initialCone(1)-cone.getY())*(initialCone(1)-cone.getY()));
+  if(loopClosingThreshold < 1 && m_currentConeIndex > 20){ //Set threshold in congig ??
+
+    return true;
+
+  } 
+
+  return false;
 }
    
   

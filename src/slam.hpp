@@ -74,6 +74,7 @@ public:
   void addConeMeasurement(Cone cone, Eigen::Vector3d measurement);
   void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
   void initializeCollection();
+  bool loopClosing(Cone cone);
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -101,6 +102,7 @@ public:
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
   bool m_newFrame = false;
+  bool m_loopClosing = false;
   
 
     // Constants for degree transformation
