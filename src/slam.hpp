@@ -98,7 +98,7 @@ public:
   double m_coneMappingThreshold = 67;
   int m_currentConeIndex = 0;
   int m_poseId = 1000;
-  uint32_t m_conesPerPacket = 20;
+  uint32_t m_conesPerPacket = 20; //Amount of cones sent as a sensor input to path planning
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
   bool m_newFrame = true;
