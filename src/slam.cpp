@@ -61,37 +61,52 @@ void Slam::nextContainer(cluon::data::Envelope data)
 
   //#####################Recieve Landmarks###########################
   if (data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDirection::ID())) {
-    std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Direction" << std::endl;
     //Retrive data and timestamp
-    cluon::data::TimeStamp timeStamp = data.sampleTimeStamp();
+    m_lastTimeStamp = data.sampleTimeStamp();
     auto coneDirection = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
-		uint32_t objectId = coneDirection.objectId();
-
+    uint32_t objectId = coneDirection.objectId();
+    std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //Check last timestamp if they are from same message
     //std::cout << "Message Recieved " << std::endl;
-    if (CheckContainer(objectId,timeStamp)){
+    m_coneCollector(0,objectId) = coneDirection.azimuthAngle();
+    m_coneCollector(1,objectId) = coneDirection.zenithAngle();
+    if (m_newFrame){
+      m_newFrame = false;
       //std::cout << "Test 2 " << std::endl;
-      m_coneCollector(0,objectId) = coneDirection.azimuthAngle();
-			m_coneCollector(1,objectId) = coneDirection.zenithAngle();
+      std::thread coneCollector (&Slam::initializeCollection,this);
     }
 
   }
   if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDistance::ID())){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Distance" << std::endl;
-    cluon::data::TimeStamp timeStamp = data.sampleTimeStamp();
+    m_lastTimeStamp = data.sampleTimeStamp();
     auto coneDistance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
     uint32_t objectId = coneDistance.objectId();
-
+    m_coneCollector(2,objectId) = coneDistance.distance();
     //Check last timestamp if they are from same message
     //std::cout << "Message Recieved " << std::endl;
-    if (CheckContainer(objectId,timeStamp)){
-      m_coneCollector(2,objectId) = coneDistance.distance();
-			m_coneCollector(3,objectId) = 0;
+    if (m_newFrame){
+       m_newFrame = false;
+       std::thread coneCollector(&Slam::initializeCollection, this);
     }
   }
-
+  if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectType::ID())){
+    std::lock_guard<std::mutex> lockCone(m_coneMutex);
+    //std::cout << "Recieved Type" << std::endl;
+    m_lastTimeStamp = data.sampleTimeStamp();
+    auto coneType = cluon::extractMessage<opendlv::logic::perception::ObjectType>(std::move(data));
+    uint32_t objectId = coneType.objectId();
+    m_coneCollector(3,objectId) = coneType.type();
+    //Check last timestamp if they are from same message
+    //std::cout << "Message Recieved " << std::endl;
+    if (m_newFrame){
+      m_newFrame = false;
+      std::thread coneCollector (&Slam::initializeCollection,this);
+    }
+  }
+  
   //#########################Recieve Odometry##################################
   if(data.dataType() == static_cast<int32_t>(opendlv::logic::sensation::Geolocation::ID())){
    
@@ -109,6 +124,28 @@ void Slam::nextContainer(cluon::data::Envelope data)
   }
 
 
+}
+
+void Slam::initializeCollection(){
+  std::this_thread::sleep_for(std::chrono::milliseconds(m_timeDiffMilliseconds));
+  Eigen::MatrixXd extractedCones;
+  {
+    std::lock_guard<std::mutex> lockCone(m_coneMutex);
+    extractedCones = m_coneCollector.leftCols(m_lastObjectId+1);
+    m_newFrame = true;
+  }
+  //Initialize for next collection
+  m_lastObjectId = 0;
+  m_coneCollector = Eigen::MatrixXd::Zero(4,20);
+  if(extractedCones.cols() > 1){
+    //std::cout << "Extracted Cones " << std::endl;
+    //std::cout << extractedCones << std::endl;
+    if(isKeyframe(m_lastTimeStamp)){
+      std::cout << "Extracted Cones " << std::endl;
+      std::cout << extractedCones << std::endl;
+      performSLAM(extractedCones);//Thread?
+    }
+  }
 }
 
 bool Slam::CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp){
@@ -406,13 +443,13 @@ std::pair<bool,opendlv::logic::sensation::Geolocation> Slam::getPose(){
   /*std::lock_guard<std::mutex> lockSensor(m_sensorMutex); 
   
   opendlv::data::environment::Point3 xyz;
-  xyz.setX(m_odometry(0));
-  xyz.setY(m_odometry(1));
+  xyz.setX(m_odometryData(0));
+  xyz.setY(m_odometryData(1));
   xyz.setZ(0);
   opendlv::data::environment::WGS84Coordinate gpsCurrent = m_gpsReference.transform(xyz);
   poseMessage.Latitude(gpsCurrent.Latitude());
   poseMessage.Longitude(gpsCurrent.Longitude());
-  poseMessage.Heading(m_odometry(2));
+  poseMessage.Heading(m_odometryData(2));
   m_sendPoseData = false;
   return std::pair(true,poseMessage);*/
 }

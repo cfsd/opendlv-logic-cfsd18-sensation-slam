@@ -22,6 +22,7 @@
 
 #include <tuple>
 #include <utility>
+#include <thread>
 #include "g2o/core/sparse_optimizer.h"
 #include "g2o/core/block_solver.h"
 #include "g2o/core/factory.h"
@@ -72,6 +73,7 @@ public:
   void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void addConeMeasurement(Cone cone, Eigen::Vector3d measurement);
   void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
+  void initializeCollection();
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -98,6 +100,7 @@ public:
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
+  bool m_newFrame = false;
   
 
     // Constants for degree transformation
