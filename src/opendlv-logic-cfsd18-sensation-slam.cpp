@@ -31,6 +31,21 @@
 #include <thread>
 typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 
+void sendCones(std::vector<ConePackage> cones,cluon::OD4Session &od4, uint32_t const senderStamp){
+  for(uint32_t i = 0; i<cones.size(); i++){
+    std::chrono::system_clock::time_point tp;
+    cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
+    ConePackage cone = cones[i];
+    opendlv::logic::perception::ObjectDirection directionMsg = std::get<0>(cone);
+    od4.send(directionMsg,sampleTime,senderStamp);
+    opendlv::logic::perception::ObjectDistance distanceMsg = std::get<1>(cone);
+    od4.send(distanceMsg,sampleTime,senderStamp);
+    opendlv::logic::perception::ObjectType typeMsg = std::get<2>(cone);
+    od4.send(typeMsg,sampleTime,senderStamp);
+  }
+}
+
+
 int32_t main(int32_t argc, char **argv) {
   int32_t retCode{0};
   auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
@@ -53,7 +68,7 @@ int32_t main(int32_t argc, char **argv) {
         slammer.nextContainer(envelope);
         std::pair<bool,std::vector<ConePackage>> conePacket = slammer.getCones();
         if(conePacket.first){
-        // slam.sendCones(conePacket.second,od4session,ID);
+          sendCones(conePacket.second,od4session,senderStamp);
         }
         std::pair<bool,opendlv::logic::sensation::Geolocation> posePacket = slammer.getPose();
         if(posePacket.first){
@@ -72,20 +87,6 @@ int32_t main(int32_t argc, char **argv) {
     }
   }
   return retCode;
-}
-
-void sendCones(std::vector<ConePackage> cones,cluon::OD4Session od4, uint32_t const senderStamp){
-  for(uint32_t i = 0; i<cones.size(); i++){
-    std::chrono::system_clock::time_point tp;
-    cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
-    ConePackage cone = cones[i];
-    opendlv::logic::perception::ObjectDirection directionMsg = std::get<0>(cone);
-    od4.send(directionMsg,sampleTime,senderStamp);
-    opendlv::logic::perception::ObjectDistance distanceMsg = std::get<1>(cone);
-    od4.send(distanceMsg,sampleTime,senderStamp);
-    opendlv::logic::perception::ObjectType typeMsg = std::get<2>(cone);
-    od4.send(typeMsg,sampleTime,senderStamp);
-  }
 }
 
 
