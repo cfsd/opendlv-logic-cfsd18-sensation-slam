@@ -1,6 +1,6 @@
 // This is an auto-generated header-only single-file distribution of libcluon.
-// Date: Thu, 22 Feb 2018 21:30:51 +0100
-// Version: 0.0.51
+// Date: Wed, 28 Feb 2018 11:09:31 +0100
+// Version: 0.0.52
 //
 //
 // Implementation of N4562 std::experimental::any (merged into C++17) for C++11 compilers.
@@ -4499,19 +4499,19 @@ class LIBCLUON_API MetaMessage {
     /**
      * @return Message identifier.
      */
-    uint32_t messageIdentifier() const noexcept;
+    int32_t messageIdentifier() const noexcept;
     /**
      * This method sets the message identifier.
      *
      * @param v Message identifier for this message.
      * @return Reference to this instance.
      */
-    MetaMessage &messageIdentifier(uint32_t v) noexcept;
+    MetaMessage &messageIdentifier(int32_t v) noexcept;
 
    private:
     std::string m_packageName{""};
     std::string m_messageName{""};
-    uint32_t m_messageIdentifier{0};
+    int32_t m_messageIdentifier{0};
     std::vector<MetaField> m_listOfMetaFields{};
 };
 } // namespace cluon
@@ -5090,7 +5090,7 @@ class LIBCLUON_API ToProtoVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -5288,7 +5288,7 @@ class LIBCLUON_API FromProtoVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -5394,7 +5394,7 @@ class LIBCLUON_API FromLCMVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -5582,7 +5582,7 @@ class LIBCLUON_API FromMsgPackVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -5697,7 +5697,7 @@ class LIBCLUON_API ToJSONVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -5829,7 +5829,7 @@ class LIBCLUON_API ToCSVVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -5924,7 +5924,7 @@ class LIBCLUON_API ToLCMVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -6040,7 +6040,7 @@ class LIBCLUON_API ToODVDVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -6129,7 +6129,7 @@ class LIBCLUON_API ToMsgPackVisitor {
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
 
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -6248,7 +6248,7 @@ class LIBCLUON_API EnvelopeToJSON {
 
    private:
     std::vector<cluon::MetaMessage> m_listOfMetaMessages{};
-    std::map<uint32_t, cluon::MetaMessage> m_scopeOfMetaMessages{};
+    std::map<int32_t, cluon::MetaMessage> m_scopeOfMetaMessages{};
 };
 } // namespace cluon
 #endif
@@ -6554,7 +6554,7 @@ class LIBCLUON_API GenericMessage {
        public:
         // The following methods are provided to allow an instance of this class to
         // be used as visitor for an instance with the method signature void accept<T>(T&);
-        void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+        void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
         void postVisit() noexcept;
 
         void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -6609,7 +6609,7 @@ class LIBCLUON_API GenericMessage {
     GenericMessage &operator=(const GenericMessage &) = default;
 
    public:
-    uint32_t ID();
+    int32_t ID();
     const std::string ShortName();
     const std::string LongName();
 
@@ -6641,7 +6641,7 @@ class LIBCLUON_API GenericMessage {
    public:
     // The following methods are provided to allow an instance of this class to
     // be used as visitor for an instance with the method signature void accept<T>(T&);
-    void preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept;
+    void preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept;
     void postVisit() noexcept;
 
     void visit(uint32_t id, std::string &&typeName, std::string &&name, bool &v) noexcept;
@@ -7309,11 +7309,11 @@ inline MetaMessage &MetaMessage::messageName(const std::string &v) noexcept {
     return *this;
 }
 
-inline uint32_t MetaMessage::messageIdentifier() const noexcept {
+inline int32_t MetaMessage::messageIdentifier() const noexcept {
     return m_messageIdentifier;
 }
 
-inline MetaMessage &MetaMessage::messageIdentifier(uint32_t v) noexcept {
+inline MetaMessage &MetaMessage::messageIdentifier(int32_t v) noexcept {
     m_messageIdentifier = v;
     return *this;
 }
@@ -7545,7 +7545,7 @@ inline std::pair<std::vector<MetaMessage>, MessageParser::MessageParserErrorCode
                           std::string _messageName = e->token;
                           mm.messageName(::stringtoolbox::trim(_messageName));
                       } else if ("NATURAL_NUMBER" == e->name) {
-                          mm.messageIdentifier(static_cast<uint32_t>(std::stoi(e->token)));
+                          mm.messageIdentifier(std::stoi(e->token));
                       } else if ("PRIMITIVE_FIELD" == e->name) {
                           std::string _fieldName;
                           auto fieldName = std::find_if(std::begin(e->nodes), std::end(e->nodes), [](auto a) { return (a->name == "IDENTIFIER"); });
@@ -8349,7 +8349,7 @@ inline std::string ToProtoVisitor::encodedData() const noexcept {
     return s;
 }
 
-inline void ToProtoVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void ToProtoVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -8725,7 +8725,7 @@ inline FromProtoVisitor &FromProtoVisitor::operator=(const FromProtoVisitor &oth
 
 ////////////////////////////////////////////////////////////////////////////////
 
-inline void FromProtoVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void FromProtoVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -8937,7 +8937,7 @@ inline void FromLCMVisitor::decodeFrom(std::istream &in) noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-inline void FromLCMVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void FromLCMVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -9411,7 +9411,7 @@ inline void FromMsgPackVisitor::decodeFrom(std::istream &in) noexcept {
     m_keyValues = readKeyValues(in);
 }
 
-inline void FromMsgPackVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void FromMsgPackVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -9608,7 +9608,7 @@ inline void FromMsgPackVisitor::visit(uint32_t id, std::string &&typeName, std::
 
 namespace cluon {
 
-inline void GenericMessage::GenericMessageVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void GenericMessage::GenericMessageVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)longName;
     m_metaMessage.messageIdentifier(id).messageName(shortName);
     if (!longName.empty()) {
@@ -9722,7 +9722,7 @@ inline std::map<uint32_t, linb::any> GenericMessage::GenericMessageVisitor::inte
 
 ////////////////////////////////////////////////////////////////////////////////
 
-inline uint32_t GenericMessage::ID() {
+inline int32_t GenericMessage::ID() {
     return m_metaMessage.messageIdentifier();
 }
 
@@ -9739,7 +9739,7 @@ inline const std::string GenericMessage::LongName() {
     return m_metaMessage.packageName() + (!m_metaMessage.packageName().empty() ? "." : "") + m_metaMessage.messageName();
 }
 
-inline void GenericMessage::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void GenericMessage::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -10032,7 +10032,7 @@ inline std::string ToJSONVisitor::json() const noexcept {
     return retVal;
 }
 
-inline void ToJSONVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void ToJSONVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)longName;
     (void)shortName;
@@ -10216,7 +10216,7 @@ inline std::string ToCSVVisitor::csv() const noexcept {
     return retVal;
 }
 
-inline void ToCSVVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void ToCSVVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -10390,7 +10390,7 @@ inline std::string ToLCMVisitor::encodedData(bool withHash) const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-inline void ToLCMVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void ToLCMVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -10812,7 +10812,7 @@ inline void ToMsgPackVisitor::encodeInt(std::ostream &o, int64_t v) {
     }
 }
 
-inline void ToMsgPackVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void ToMsgPackVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)id;
     (void)shortName;
     (void)longName;
@@ -11106,7 +11106,7 @@ inline std::string ToODVDVisitor::messageSpecification() const noexcept {
     return retVal;
 }
 
-inline void ToODVDVisitor::preVisit(uint32_t id, const std::string &shortName, const std::string &longName) noexcept {
+inline void ToODVDVisitor::preVisit(int32_t id, const std::string &shortName, const std::string &longName) noexcept {
     (void)shortName;
     m_buffer << "message " << longName << " [ id = " << id << " ] {" << '\n';
 }
@@ -11303,7 +11303,7 @@ inline std::string EnvelopeToJSON::getJSONFromProtoEncodedEnvelope(const std::st
 inline std::string EnvelopeToJSON::getJSONFromEnvelope(cluon::data::Envelope &envelope) noexcept {
     std::string retVal{"{}"};
     if (!m_listOfMetaMessages.empty()) {
-        if (0 < m_scopeOfMetaMessages.count(static_cast<uint32_t>(envelope.dataType()))) {
+        if (0 < m_scopeOfMetaMessages.count(envelope.dataType())) {
             // First, create JSON from Envelope.
             constexpr bool OUTER_CURLY_BRACES{false};
             // Ignore field 2 (= serializedData) as it will be replaced below.
@@ -11316,7 +11316,7 @@ inline std::string EnvelopeToJSON::getJSONFromEnvelope(cluon::data::Envelope &en
             protoDecoder.decodeFrom(sstr);
 
             // Now, create JSON from payload.
-            cluon::MetaMessage payload{m_scopeOfMetaMessages[static_cast<uint32_t>(envelope.dataType())]};
+            cluon::MetaMessage payload{m_scopeOfMetaMessages[envelope.dataType()]};
             cluon::GenericMessage gm;
 
             // Create "empty" GenericMessage from this MetaMessage.
@@ -12626,7 +12626,7 @@ class LIB_API {{%MESSAGE%}} {
         ~{{%MESSAGE%}}() = default;
 
     public:
-        static uint32_t ID();
+        static int32_t ID();
         static const std::string ShortName();
         static const std::string LongName();
         {{#%FIELDS%}}
@@ -12676,7 +12676,7 @@ const char *sourceFileTemplate = R"(
  */
 {{%NAMESPACE_OPENING%}}
 
-uint32_t {{%MESSAGE%}}::ID() {
+int32_t {{%MESSAGE%}}::ID() {
     return {{%IDENTIFIER%}};
 }
 
@@ -13137,4 +13137,3 @@ int main(int argc, char **argv) {
     return retCode;
 }
 #endif
-
