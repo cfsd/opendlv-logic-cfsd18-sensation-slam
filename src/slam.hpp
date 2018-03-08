@@ -33,7 +33,7 @@
 #include "g2o/types/slam2d/vertex_point_xy.h"
 #include "g2o/types/slam2d/edge_se2.h"
 #include "g2o/types/slam2d/edge_se2_pointxy.h"
-#include<Eigen/Dense>
+#include <Eigen/Dense>
 #include "cluon-complete.hpp"
 #include "opendlv-standard-message-set.hpp"
 
@@ -92,7 +92,7 @@ public:
   Eigen::Vector3d m_odometryData;
   //opendlv::data::environment::WGS84Coordinate m_gpsReference;
   std::vector<Cone> m_map;
-  double m_newConeThreshold= 3;
+  double m_newConeThreshold= 1;
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
   double m_coneMappingThreshold = 67;

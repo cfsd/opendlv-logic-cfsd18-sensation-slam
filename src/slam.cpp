@@ -60,7 +60,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
   
   //All the ifs need sender stamp checks to make sure the data is from detectcone
   //#####################Recieve Landmarks###########################
-  if (data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDirection::ID())) {
+  if (data.dataType() == opendlv::logic::perception::ObjectDirection::ID()) {
     //std::cout << "Recieved Direction" << std::endl;
     //Retrive data and timestamp
     m_lastTimeStamp = data.sampleTimeStamp();
@@ -80,7 +80,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
     }
   }
 
-  if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectDistance::ID())){
+  if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Distance" << std::endl;
     m_lastTimeStamp = data.sampleTimeStamp();
@@ -97,7 +97,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
     }
   }
 
-  if(data.dataType() == static_cast<int32_t>(opendlv::logic::perception::ObjectType::ID())){
+  if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
     std::lock_guard<std::mutex> lockCone(m_coneMutex);
     //std::cout << "Recieved Type" << std::endl;
     m_lastTimeStamp = data.sampleTimeStamp();
@@ -115,7 +115,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
   }
   
   //#########################Recieve Odometry##################################
-  if(data.dataType() == static_cast<int32_t>(opendlv::logic::sensation::Geolocation::ID())){
+  if(data.dataType() == opendlv::logic::sensation::Geolocation::ID()){
    
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     auto odometry = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(data));
@@ -144,8 +144,8 @@ void Slam::initializeCollection(){
     m_coneCollector = Eigen::MatrixXd::Zero(4,20);
   }
   //Initialize for next collection
-  std::cout << "Collection done" << std::endl;
-  if(extractedCones.cols() > 1){
+  std::cout << "Collection done" << extractedCones.cols() << std::endl;
+  if(extractedCones.cols() > 0){
     //std::cout << "Extracted Cones " << std::endl;
     //std::cout << extractedCones << std::endl;
     if(isKeyframe(m_lastTimeStamp)){//Can add check to make sure only one process is running at a time
@@ -305,7 +305,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
     std::cout << "Added the first cone" << std::endl;
   }
 
-  double minDistance = 1000;
+  double minDistance = 100;
   for(uint32_t i = 0; i<cones.cols(); i++){//Iterate through local cone objects
     double distanceToCar = cones(2,i);
     for(uint32_t j = 0; j<m_map.size(); j++){ //Iteration through global map
@@ -323,7 +323,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
               m_loopClosing = true; //Only want one full loopclosing
            }
 
-          if(distanceToCar>minDistance){//Update current cone to know where in the map we are
+          if(distanceToCar<minDistance){//Update current cone to know where in the map we are
             m_currentConeIndex = j;
             minDistance = distanceToCar;
 
