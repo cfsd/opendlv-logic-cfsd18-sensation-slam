@@ -308,44 +308,44 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
   double minDistance = 100;
   for(uint32_t i = 0; i<cones.cols(); i++){//Iterate through local cone objects
     double distanceToCar = cones(2,i);
-    for(uint32_t j = 0; j<m_map.size(); j++){ //Iteration through global map
+    Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i)); //Make local cone into global coordinate frame
+    uint32_t j = 0;
+    bool coneFound = false;
+    while(!coneFound || j<m_map.size()){
       if(fabs(m_map[j].getType() - cones(3,i))<0.0001){ //Check is same classification
-        Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i)); //Make local cone into global coordinate frame
+    
         double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1)); //Check distance between new global cone and current j global cone
         distance = std::sqrt(distance);
         std::cout << distance << std::endl;
         if(distance<m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
-	         addConeMeasurement(m_map[j],cones.col(i)); //Add measurement to graph
+          coneFound = true;
+	  addConeMeasurement(m_map[j],cones.col(i)); //Add measurement to graph
 
-           if(loopClosing(m_map[j]) && m_loopClosing == false){ //Check if the new cone is a loop closing candidate
-              std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-              optimizeGraph(m_optimizer); //Do full bundle adjustment
-              m_loopClosing = true; //Only want one full loopclosing
-           }
+          if(loopClosing(m_map[j]) && m_loopClosing == false){ //Check if the new cone is a loop closing candidate
+            std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+            optimizeGraph(m_optimizer); //Do full bundle adjustment
+            m_loopClosing = true; //Only want one full loopclosing
+          }
 
           if(distanceToCar<minDistance){//Update current cone to know where in the map we are
             m_currentConeIndex = j;
             minDistance = distanceToCar;
 
             //Loopcloser
-
-
           }
-          break;
-        }
-        if(distanceToCar < m_coneMappingThreshold){
-          Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
-
-          
-          m_map.push_back(cone); //Add Cone
-          std::cout << "Added a new cone" << std::endl;
-          addConeToGraph(cone,cones.col(i));
-
-          std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-          optimizeGraph(m_optimizer);
-          //Add Threading??
         }
       }
+    }
+    if(distanceToCar < m_coneMappingThreshold && !coneFound){
+      
+      Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
+      m_map.push_back(cone); //Add Cone
+      std::cout << "Added a new cone" << std::endl;
+      addConeToGraph(cone,cones.col(i));
+
+      std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+      optimizeGraph(m_optimizer);
+      //Add Threading??
     }
   }
 }
