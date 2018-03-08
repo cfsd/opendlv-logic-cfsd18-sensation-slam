@@ -64,7 +64,7 @@ public:
   bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
   bool isKeyframe(cluon::data::TimeStamp startTime);
   void addOdometryMeasurement(Eigen::Vector3d pose);
-  void optimizeGraph(g2o::SparseOptimizer &optimizer);
+  void optimizeGraph();
   void addPoseToGraph(Eigen::Vector3d pose);
   void performSLAM(Eigen::MatrixXd Cones);
   Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);

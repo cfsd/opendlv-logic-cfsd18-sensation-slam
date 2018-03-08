@@ -200,7 +200,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     pose = m_odometryData;
   }
-
+  std::cout << "Adding cones to map" << std::endl;
   addPoseToGraph(pose);
   addConesToMap(cones,pose);
 }
@@ -220,8 +220,6 @@ void Slam::addOdometryMeasurement(Eigen::Vector3d pose){
   if(m_poseId>1000){
     g2o::EdgeSE2* odometryEdge = new g2o::EdgeSE2;
 
-    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-
     odometryEdge->vertices()[0] = m_optimizer.vertex(m_poseId-1);
     odometryEdge->vertices()[1] = m_optimizer.vertex(m_poseId);
     g2o::VertexSE2* prevVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(m_poseId-1));
@@ -234,16 +232,16 @@ void Slam::addOdometryMeasurement(Eigen::Vector3d pose){
   }
 }
 
-void Slam::optimizeGraph(g2o::SparseOptimizer &optimizer){
+void Slam::optimizeGraph(){
 
 
-  g2o::VertexSE2* firstRobotPose = dynamic_cast<g2o::VertexSE2*>(optimizer.vertex(0));
+  g2o::VertexSE2* firstRobotPose = dynamic_cast<g2o::VertexSE2*>(m_optimizer.vertex(1000));
   firstRobotPose->setFixed(true);
-  optimizer.setVerbose(true);
+  m_optimizer.setVerbose(true);
 
   std::cout << "Optimizing" << std::endl;
-  optimizer.initializeOptimization();
-  optimizer.optimize(10); //Add config for amount of iterations??
+  m_optimizer.initializeOptimization();
+  m_optimizer.optimize(10); //Add config for amount of iterations??
   std::cout << "Optimizing done." << std::endl;
 
 }
@@ -287,8 +285,6 @@ void Slam::addConeMeasurement(Cone cone, Eigen::Vector3d measurement){
   Eigen::Vector2d xyMeasurement;
   xyMeasurement << xyzMeasurement(0),xyzMeasurement(1);
 
-  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-
   coneMeasurement->vertices()[0] = m_optimizer.vertex(m_poseId);
   coneMeasurement->vertices()[1] = m_optimizer.vertex(cone.getId());
   coneMeasurement->setMeasurement(xyMeasurement);
@@ -298,10 +294,12 @@ void Slam::addConeMeasurement(Cone cone, Eigen::Vector3d measurement){
 
 void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches cones with previous cones and adds newly found cones to map
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
-  if(m_map.size() ==0){
-    Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(1));
+  if(m_map.size() == 0){
+    Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(0));
     Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
     m_map.push_back(cone);
+    addConeToGraph(cone,cones.col(0));
+    
     std::cout << "Added the first cone" << std::endl;
   }
 
@@ -311,19 +309,19 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i)); //Make local cone into global coordinate frame
     uint32_t j = 0;
     bool coneFound = false;
-    while(!coneFound || j<m_map.size()){
+    while(!coneFound && j<m_map.size()){
       if(fabs(m_map[j].getType() - cones(3,i))<0.0001){ //Check is same classification
     
         double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1)); //Check distance between new global cone and current j global cone
         distance = std::sqrt(distance);
         std::cout << distance << std::endl;
-        if(distance>m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
+        if(distance<m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
           coneFound = true;
+          std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
 	  addConeMeasurement(m_map[j],cones.col(i)); //Add measurement to graph
 
           if(loopClosing(m_map[j]) && m_loopClosing == false){ //Check if the new cone is a loop closing candidate
-            std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-            optimizeGraph(m_optimizer); //Do full bundle adjustment
+            //optimizeGraph(); //Do full bundle adjustment
             m_loopClosing = true; //Only want one full loopclosing
           }
 
@@ -335,16 +333,16 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
           }
         }
       }
+      j++;
     }
     if(distanceToCar < m_coneMappingThreshold && !coneFound){
-      
+      std::cout << "Trying to add cone" << std::endl;
       Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
       m_map.push_back(cone); //Add Cone
       std::cout << "Added a new cone" << std::endl;
       addConeToGraph(cone,cones.col(i));
-
       std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-      optimizeGraph(m_optimizer);
+      optimizeGraph();
       //Add Threading??
     }
   }
