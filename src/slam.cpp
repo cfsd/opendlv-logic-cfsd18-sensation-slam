@@ -366,14 +366,9 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
 std::pair<bool,std::vector<Slam::ConePackage>> Slam::getCones()
 {
   std::vector<ConePackage> v_conePackage;
-<<<<<<< HEAD
-  if(!m_sendConeData){
-    std::cout << m_map.size() << std::endl;
-    return std::pair<bool,std::vector<Slam::ConePackage>>(false,v_conePackage);
-=======
   if(!m_sendConeData){ //When do we want to send cones
+    std::cout << m_map.size() << std::endl;
     return std::pair<bool,std::vector<Slam::ConePackage>>(false,v_conePackage); //If we do not want to send cones, return this
->>>>>>> a0ad25fa1ecbc103adfb2b1c2c4a9346c174450a
   }
     Eigen::Vector3d pose;
   {
