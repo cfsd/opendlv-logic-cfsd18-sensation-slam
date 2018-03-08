@@ -109,7 +109,7 @@ void Slam::nextContainer(cluon::data::Envelope data)
     //std::cout << "Message Recieved " << std::endl;
     if (m_newFrame){
       m_newFrame = false;
-      std::thread coneCollector (&Slam::initializeCollection,this);
+      std::thread coneCollector (&Slam::initializeCollection,this); //just sleep instead maybe since this is unclear how it works
       coneCollector.detach();
     }
   }
@@ -317,7 +317,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
         double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1)); //Check distance between new global cone and current j global cone
         distance = std::sqrt(distance);
         std::cout << distance << std::endl;
-        if(distance<m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
+        if(distance>m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
           coneFound = true;
 	  addConeMeasurement(m_map[j],cones.col(i)); //Add measurement to graph
 
