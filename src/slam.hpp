@@ -65,6 +65,8 @@ public:
   bool isKeyframe(cluon::data::TimeStamp startTime);
   void addOdometryMeasurement(Eigen::Vector3d pose);
   void optimizeGraph();
+  void localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones);
+  Eigen::Vector3d updatePose(Eigen::Vector3d pose, Eigen::Vector2d errorDistance);
   void addPoseToGraph(Eigen::Vector3d pose);
   void performSLAM(Eigen::MatrixXd Cones);
   Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
@@ -75,6 +77,8 @@ public:
   void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
   void initializeCollection();
   bool loopClosing(Cone cone);
+  double distanceBetweenCones(Cone c1, Cone c2);
+  void updateMap();
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -103,6 +107,7 @@ public:
   bool m_sendPoseData = false;
   bool m_newFrame = true;
   bool m_loopClosing = false;
+  bool m_loopClosingComplete = false;
   
 
     // Constants for degree transformation
