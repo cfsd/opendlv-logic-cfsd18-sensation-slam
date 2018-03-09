@@ -212,7 +212,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   }
 
 
-  if(m_loopClosingComplete){
+  if(m_loopClosingComplete && cones.cols() > 1){ //Use minimum of two cones for robustness
 
     localizer(pose, cones);
 
