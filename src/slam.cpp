@@ -257,6 +257,7 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   m_odometryData(0) = pose(0);
   m_odometryData(1) = pose(1);
 
+  //Send this back to the UKF for better predications in next iteration ?!?
 }
 
 Eigen::Vector3d Slam::updatePose(Eigen::Vector3d pose, Eigen::Vector2d errorDistance){
