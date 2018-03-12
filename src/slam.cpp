@@ -20,6 +20,7 @@
 #include <iostream>
 
 #include "slam.hpp"
+#include "WGS84toCartesian.hpp"
 
 Slam::Slam() :
   m_optimizer()
@@ -31,7 +32,7 @@ Slam::Slam() :
 , m_mapMutex()
 , m_optimizerMutex()
 , m_odometryData()
-//, m_gpsReference()
+, m_gpsReference()
 , m_map()
 , m_keyframeTimeStamp()
 {
@@ -120,14 +121,23 @@ void Slam::nextContainer(cluon::data::Envelope data)
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     auto odometry = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(data));
 
-    //double longitude = odometry.Longitude();
-    //double latitude = odometry.Latitude();
+    double longitude = odometry.longitude();
+    double latitude = odometry.latitude();
+
+    //toCartesian(const std::array<double, 2> &WGS84Reference, const std::array<double, 2> &WGS84Position)
+
+    std::array<double,2> WGS84ReadingTemp;
+
+    WGS84ReadingTemp[0] = longitude;
+    WGS84ReadingTemp[1] = latitude;
+
+    std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
     //opendlv::data::environment::WGS84Coordinate gpsCurrent = opendlv::data::environment::WGS84Coordinate(latitude, longitude);
     //opendlv::data::environment::Point3 gpsTransform = m_gpsReference.transform(gpsCurrent);
 
-    //m_odometryData << gpsTransform.getX(),
-    //                  gpsTransform.getY(),
-    //                  odometry.getHeading();
+    m_odometryData << WGS84Reading[0],
+                      WGS84Reading[1],
+                      odometry.heading();
   }
 
 
@@ -589,6 +599,8 @@ void Slam::updateMap(){
 
 void Slam::setUp()
 {
+  m_gpsReference[0] = 0;
+  m_gpsReference[1] = 0;
   //auto kv = getKeyValueConfiguration();
   //m_timeDiffMilliseconds = kv.getValue<double>("logic-cfsd18-perception-detectcone.timeDiffMilliseconds");
   //m_newConeThreshold = kv.getValue<double>("logic-cfsd18-sensation-slam.newConeLimit");

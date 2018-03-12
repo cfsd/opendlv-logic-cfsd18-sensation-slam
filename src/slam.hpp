@@ -95,7 +95,7 @@ public:
   std::mutex m_mapMutex;
   std::mutex m_optimizerMutex;
   Eigen::Vector3d m_odometryData;
-  //opendlv::data::environment::WGS84Coordinate m_gpsReference;
+  std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
   double m_newConeThreshold= 1;
   cluon::data::TimeStamp m_keyframeTimeStamp;
