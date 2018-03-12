@@ -101,7 +101,7 @@ public:
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
   double m_coneMappingThreshold = 67;
-  int m_currentConeIndex = 0;
+  uint32_t m_currentConeIndex = 0;
   int m_poseId = 1000;
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
@@ -109,6 +109,8 @@ public:
   bool m_newFrame = true;
   bool m_loopClosing = false;
   bool m_loopClosingComplete = false;
+  Eigen::Vector3d m_sendPose;
+  std::mutex m_sendMutex;
   
 
     // Constants for degree transformation
