@@ -226,7 +226,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
 
   //Use current pose to evaluate which cones you see
- Eigen::MatrixXd coneObservedGlobal = coneToGlobal(pose, cones);
+ Eigen::MatrixXd coneObservedGlobal = conesToGlobal(pose, cones);
  Eigen::Vector2d errorDistance;
  errorDistance << 0,0;
  uint32_t amountOfConesReobserved = 0;
@@ -375,7 +375,7 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i)); //Make local cone into global coordinate frame
     uint32_t j = 0;
     bool coneFound = false;
-    while(!coneFound && j<m_map.size() && !m_loopClosingComplete){
+    while(!coneFound && j<m_map.size() && !m_loopClosing){
       if(fabs(m_map[j].getType() - cones(3,i))<0.0001){ //Check is same classification
     
         double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1)); //Check distance between new global cone and current j global cone
