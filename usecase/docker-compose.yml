@@ -11,7 +11,7 @@ services:
         image: "graphslam:graphslamv0.0.1"
         network_mode: "host"
         ipc: host
-        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID}"
+        command: "/usr/bin/opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=118 --estimationId=114 --gatheringTimeMs=10 --sameConeThreshold=1.2 --refLatitude=48.123141 --refLongitude=12.34534 --timeBetweenKeyframes=0.5 --coneMappingThreshold=50 --conesPerPacket=20"
     odcockpit:
         image: ${IMAGE}
         network_mode: host

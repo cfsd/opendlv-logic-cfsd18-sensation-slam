@@ -50,7 +50,7 @@ private:
  Slam &operator=(Slam &&) = delete;
  typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 public:
-  Slam();
+  Slam(std::map<std::string, std::string> commandlineArguments);
   ~Slam() = default;
   void nextContainer(cluon::data::Envelope data);
   std::pair<bool,std::vector<ConePackage>> getCones();
@@ -58,13 +58,16 @@ public:
   
 
  private:
-  void setUp();
+  void setUp(std::map<std::string, std::string> commandlineArguments);
   void setupOptimizer();
   void tearDown();
   bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
   bool isKeyframe(cluon::data::TimeStamp startTime);
   void addOdometryMeasurement(Eigen::Vector3d pose);
   void optimizeGraph();
+  void localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones);
+  Eigen::Vector3d updatePoseFromGraph();
+  Eigen::Vector3d updatePose(Eigen::Vector3d pose, Eigen::Vector2d errorDistance);
   void addPoseToGraph(Eigen::Vector3d pose);
   void performSLAM(Eigen::MatrixXd Cones);
   Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
@@ -75,6 +78,8 @@ public:
   void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
   void initializeCollection();
   bool loopClosing(Cone cone);
+  double distanceBetweenCones(Cone c1, Cone c2);
+  void updateMap();
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -90,7 +95,7 @@ public:
   std::mutex m_mapMutex;
   std::mutex m_optimizerMutex;
   Eigen::Vector3d m_odometryData;
-  //opendlv::data::environment::WGS84Coordinate m_gpsReference;
+  std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
   double m_newConeThreshold= 1;
   cluon::data::TimeStamp m_keyframeTimeStamp;
@@ -103,6 +108,7 @@ public:
   bool m_sendPoseData = false;
   bool m_newFrame = true;
   bool m_loopClosing = false;
+  bool m_loopClosingComplete = false;
   
 
     // Constants for degree transformation
