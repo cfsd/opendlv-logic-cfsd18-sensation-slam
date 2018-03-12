@@ -48,11 +48,11 @@ void sendCones(std::vector<ConePackage> cones,cluon::OD4Session &od4, uint32_t c
 
 int32_t main(int32_t argc, char **argv) {
   int32_t retCode{0};
-  auto commandlineArguments = cluon::getCommandlineArguments(argc, argv);
-  if (0 == commandlineArguments.count("cid")) {
+  std::map<std::string, std::string> commandlineArguments = cluon::getCommandlineArguments(argc, argv);
+  if (commandlineArguments.count()<10) {
     std::cerr << argv[0] << " is a slam implementation for the CFSD18 project." << std::endl;
-    std::cerr << "Usage:   " << argv[0] << " --cid=<OpenDaVINCI session> [--id=<Identifier in case of simulated units>] [--verbose]" << std::endl;
-    std::cerr << "Example: " << argv[0] << " --cid=111" << std::endl;
+    std::cerr << "Usage:   " << argv[0] << " --cid=<OpenDaVINCI session> [--id=<Identifier in case of simulated units>] [--verbose] [Module specific parameters....]" << std::endl;
+    std::cerr << "Example: " << argv[0] << "--cid=111 --id=120 --detectConeId=118 --estimationId=114 --gatheringTimeMs=10 --sameConeThreshold=1.2 --refLatitude=48.123141 --refLongitude=12.34534 --timeBetweenKeyframes=0.5 --coneMappingThreshold=50 --conesPerPacket=20" <<  std::endl;
     retCode = 1;
   } else {
     uint32_t const ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
@@ -62,19 +62,23 @@ int32_t main(int32_t argc, char **argv) {
     // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
     cluon::data::Envelope data;
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
-    Slam slam;
+    Slam slam(commandlineArguments);
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"])),
-      [&data, &slammer = slam, &od4session = od4, senderStamp = ID](cluon::data::Envelope &&envelope){
-        slammer.nextContainer(envelope);
-        std::pair<bool,std::vector<ConePackage>> conePacket = slammer.getCones();
-        if(conePacket.first){
-          sendCones(conePacket.second,od4session,senderStamp);
-        }
-        std::pair<bool,opendlv::logic::sensation::Geolocation> posePacket = slammer.getPose();
-        if(posePacket.first){
-           std::chrono::system_clock::time_point tp;
-           cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
-           od4session.send(posePacket.second,sampleTime,senderStamp);
+      [&data, &slammer = slam, &od4session = od4, senderStamp = ID, &configuration = commandlineArguments](cluon::data::Envelope &&envelope){
+        uint32_t detectconeStamp = static_cast<uint32_t>(std::stoi(configuration["detectConeId"]));
+        uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(configuration["estimationId"]));
+        if(envelope.senderStamp() == detectconeStamp || envelope.senderStamp() == estimationStamp){
+          slammer.nextContainer(envelope);
+          std::pair<bool,std::vector<ConePackage>> conePacket = slammer.getCones();
+          if(conePacket.first){
+            sendCones(conePacket.second,od4session,senderStamp);
+          }
+          std::pair<bool,opendlv::logic::sensation::Geolocation> posePacket = slammer.getPose();
+          if(posePacket.first){
+            std::chrono::system_clock::time_point tp;
+            cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
+            od4session.send(posePacket.second,sampleTime,senderStamp);
+          }
         }  
       }
     };

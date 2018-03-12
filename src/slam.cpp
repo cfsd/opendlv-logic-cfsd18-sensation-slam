@@ -22,7 +22,7 @@
 #include "slam.hpp"
 #include "WGS84toCartesian.hpp"
 
-Slam::Slam() :
+Slam::Slam(std::map<std::string, std::string> commandlineArguments) :
   m_optimizer()
 , m_lastTimeStamp()
 , m_coneCollector()
@@ -37,6 +37,7 @@ Slam::Slam() :
 , m_keyframeTimeStamp()
 {
   setupOptimizer();
+  setUp(commandlineArguments);
   m_coneCollector = Eigen::MatrixXd::Zero(4,20);
   m_lastObjectId = 0;
   m_odometryData << 0,0,0;
@@ -597,10 +598,17 @@ void Slam::updateMap(){
    
   
 
-void Slam::setUp()
+void Slam::setUp(std::map<std::string, std::string> configuration)
 {
-  m_gpsReference[0] = 0;
-  m_gpsReference[1] = 0;
+
+  m_timeDiffMilliseconds = static_cast<uint32_t>(std::stoi(configuration["gatheringTimeMs"]));
+  m_newConeThreshold = static_cast<double>(std::stod(configuration["sameConeThreshold"]));
+  m_gpsReference[0] = static_cast<double>(std::stod(configuration["refLatitude"]));
+  m_gpsReference[1] = static_cast<double>(std::stod(configuration["refLongitude"]));
+  m_timeBetweenKeyframes = static_cast<double>(std::stod(configuration["timeBetweenKeyframes"]));
+  m_coneMappingThreshold = static_cast<double>(std::stod(configuration["coneMappingThreshold"]));
+  m_conesPerPacket = static_cast<int>(std::stoi(configuration["conesPerPacket"]));
+  std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   //auto kv = getKeyValueConfiguration();
   //m_timeDiffMilliseconds = kv.getValue<double>("logic-cfsd18-perception-detectcone.timeDiffMilliseconds");
   //m_newConeThreshold = kv.getValue<double>("logic-cfsd18-sensation-slam.newConeLimit");

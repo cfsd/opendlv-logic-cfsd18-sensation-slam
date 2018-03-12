@@ -50,7 +50,7 @@ private:
  Slam &operator=(Slam &&) = delete;
  typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 public:
-  Slam();
+  Slam(std::map<std::string, std::string> commandlineArguments);
   ~Slam() = default;
   void nextContainer(cluon::data::Envelope data);
   std::pair<bool,std::vector<ConePackage>> getCones();
@@ -58,7 +58,7 @@ public:
   
 
  private:
-  void setUp();
+  void setUp(std::map<std::string, std::string> commandlineArguments);
   void setupOptimizer();
   void tearDown();
   bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
