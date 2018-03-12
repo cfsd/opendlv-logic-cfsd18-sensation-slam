@@ -66,6 +66,7 @@ public:
   void addOdometryMeasurement(Eigen::Vector3d pose);
   void optimizeGraph();
   void localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones);
+  Eigen::Vector3d updatePoseFromGraph();
   Eigen::Vector3d updatePose(Eigen::Vector3d pose, Eigen::Vector2d errorDistance);
   void addPoseToGraph(Eigen::Vector3d pose);
   void performSLAM(Eigen::MatrixXd Cones);

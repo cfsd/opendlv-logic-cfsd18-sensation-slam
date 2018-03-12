@@ -201,12 +201,17 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     pose = m_odometryData;
   }
   std::cout << "Adding cones to map" << std::endl;
-  addPoseToGraph(pose);
 
+  {
+  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+  addPoseToGraph(pose);
+  }
   //Maybe add m_loopClosingComplete check here
 
   if(!m_loopClosingComplete){
 
+
+    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
     addConesToMap(cones,pose);
 
   }
@@ -230,34 +235,75 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
  Eigen::Vector2d errorDistance;
  errorDistance << 0,0;
  uint32_t amountOfConesReobserved = 0;
+ uint32_t j = 0;
+ bool coneFound = false;
  //Find local cone ID by iterate through map
+
   for(uint32_t i = 0; i < cones.cols(); i++){
-    Cone coneEvaluatedInMap = Cone(coneObservedGlobal(0,i),coneObservedGlobal(1,i),0,2000);
 
 
-    for(uint32_t j = 0; j < m_map.size(); j++){
+    while(!coneFound && j < m_map.size()){
 
-      if(distanceBetweenCones(m_map[j],coneEvaluatedInMap) < 1){
+        Cone coneEvaluatedInMap = Cone(coneObservedGlobal(0,i),coneObservedGlobal(1,i),0,2000);
 
-        errorDistance(0) += m_map[j].getX()-coneEvaluatedInMap.getX();
-        errorDistance(1) += m_map[j].getY()-coneEvaluatedInMap.getY();
-        amountOfConesReobserved++;
+        if(distanceBetweenCones(m_map[j],coneEvaluatedInMap) < 1){
+
+
+          //Non graph localizer
+          errorDistance(0) += m_map[j].getX()-coneEvaluatedInMap.getX();
+          errorDistance(1) += m_map[j].getY()-coneEvaluatedInMap.getY();
+          amountOfConesReobserved++;
+          coneFound = true;
+
+
+          //Graph based localizer
+
+          std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+          addConeMeasurement(m_map[j], pose);
+
       }
 
-    }
-
-
+    j++;
   }
+
+ }
+
+
+  //Non grapher
   errorDistance(0) = errorDistance(0)/amountOfConesReobserved;
   errorDistance(1) = errorDistance(1)/amountOfConesReobserved;
 
   pose = updatePose(pose, errorDistance);
 
-  std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
-  m_odometryData(0) = pose(0);
-  m_odometryData(1) = pose(1);
+  {
+    std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+    m_odometryData(0) = pose(0);
+    m_odometryData(1) = pose(1);
+  }
+  //Graph
+
+  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+  optimizeGraph();
+  Eigen::Vector3d updatedPoseVectorGraph = updatePoseFromGraph();
+
+  {
+    std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+    m_odometryData(0) = updatedPoseVectorGraph(0);
+    m_odometryData(1) = updatedPoseVectorGraph(1);
+  }
+  //UPDATE POSE FROM VERTEX
 
   //Send this back to the UKF for better predications in next iteration ?!?
+}
+
+Eigen::Vector3d Slam::updatePoseFromGraph(){
+
+
+  g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(m_poseId));
+  g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
+  Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
+
+  return updatedPose;
 }
 
 Eigen::Vector3d Slam::updatePose(Eigen::Vector3d pose, Eigen::Vector2d errorDistance){
@@ -274,7 +320,6 @@ void Slam::addPoseToGraph(Eigen::Vector3d pose){
   poseVertex->setId(m_poseId);
   poseVertex->setEstimate(pose);
 
-  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
   m_optimizer.addVertex(poseVertex);
   addOdometryMeasurement(pose);
   m_poseId++;
@@ -301,7 +346,7 @@ void Slam::optimizeGraph(){
 
   g2o::VertexSE2* firstRobotPose = dynamic_cast<g2o::VertexSE2*>(m_optimizer.vertex(1000));
   firstRobotPose->setFixed(true);
-  m_optimizer.setVerbose(true);
+  //m_optimizer.setVerbose(true);
 
   std::cout << "Optimizing" << std::endl;
   m_optimizer.initializeOptimization();
@@ -339,8 +384,6 @@ void Slam::addConeToGraph(Cone cone, Eigen::Vector3d measurement){
   coneVertex->setId(cone.getId());
   coneVertex->setEstimate(conePose);
 
-  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-
   m_optimizer.addVertex(coneVertex);
   addConeMeasurement(cone, measurement);
 }
@@ -364,6 +407,9 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(0));
     Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
     m_map.push_back(cone);
+
+
+    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
     addConeToGraph(cone,cones.col(0));
     
     std::cout << "Added the first cone" << std::endl;
@@ -378,8 +424,11 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
     while(!coneFound && j<m_map.size() && !m_loopClosing){
       if(fabs(m_map[j].getType() - cones(3,i))<0.0001){ //Check is same classification
     
-        double distance = (m_map[j].getX()-globalCone(0))*(m_map[j].getX()-globalCone(0))+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1)); //Check distance between new global cone and current j global cone
-        distance = std::sqrt(distance);
+        Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
+        double distance = distanceBetweenCones(m_map[j],globalConeObject);
+
+        //(m_map[j].getX()-globalConeObject.getX())*(m_map[j].getX()-globalConeObject.getX())+(m_map[j].getY()-globalCone(1))*(m_map[j].getY()-globalCone(1)); //Check distance between new global cone and current j global cone
+        //distance = std::sqrt(distance);
         std::cout << distance << std::endl;
         if(distance<m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
           coneFound = true;
@@ -406,8 +455,9 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
       Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_map.size()); //Temp id, think of system later
       m_map.push_back(cone); //Add Cone
       std::cout << "Added a new cone" << std::endl;
-      addConeToGraph(cone,cones.col(i));
+
       std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+      addConeToGraph(cone,cones.col(i));
       optimizeGraph();
       updateMap();
       //Add Threading??
