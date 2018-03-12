@@ -533,19 +533,19 @@ std::pair<bool,opendlv::logic::sensation::Geolocation> Slam::getPose(){
   if(!m_sendPoseData){
     return std::pair<bool,opendlv::logic::sensation::Geolocation>(false,poseMessage);
   }
-  return std::pair<bool,opendlv::logic::sensation::Geolocation>(false,poseMessage);
-  /*std::lock_guard<std::mutex> lockSensor(m_sensorMutex); 
-  
-  opendlv::data::environment::Point3 xyz;
-  xyz.setX(m_odometryData(0));
-  xyz.setY(m_odometryData(1));
-  xyz.setZ(0);
-  opendlv::data::environment::WGS84Coordinate gpsCurrent = m_gpsReference.transform(xyz);
-  poseMessage.Latitude(gpsCurrent.Latitude());
-  poseMessage.Longitude(gpsCurrent.Longitude());
-  poseMessage.Heading(m_odometryData(2));
-  m_sendPoseData = false;
-  return std::pair(true,poseMessage);*/
+
+  std::lock_guard<std::mutex> lockSensor(m_sensorMutex); 
+
+  std::array<double,2> cartesianPos;
+  cartesianPos[0] = m_odometryData(0);
+  cartesianPos[1] = m_odometryData(1);
+  std::array<double,2> sendGPS = wgs84::fromCartesian(m_gpsReference, cartesianPos);
+  poseMessage.longitude(static_cast<float>(sendGPS[0]));
+  poseMessage.latitude(static_cast<float>(sendGPS[1]));
+  poseMessage.heading(static_cast<float>(m_odometryData(2)));
+
+  return std::pair<bool,opendlv::logic::sensation::Geolocation>(true,poseMessage);
+
 }
 
 bool Slam::loopClosing(Cone cone){
