@@ -217,15 +217,15 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   std::cout << "Adding cones to map" << std::endl;
 
   {
-  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-  addPoseToGraph(pose);
+    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+    addPoseToGraph(pose);
   }
   //Maybe add m_loopClosingComplete check here
 
   if(!m_loopClosingComplete){
 
 
-    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+    //std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
     addConesToMap(cones,pose);
 
   }
