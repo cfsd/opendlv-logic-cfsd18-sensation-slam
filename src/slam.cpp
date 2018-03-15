@@ -68,56 +68,67 @@ void Slam::nextContainer(cluon::data::Envelope data)
     m_lastTimeStamp = data.sampleTimeStamp();
     auto coneDirection = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
     uint32_t objectId = coneDirection.objectId();
-    std::lock_guard<std::mutex> lockCone(m_coneMutex);
-    //Check last timestamp if they are from same message
-    //std::cout << "Message Recieved " << std::endl;
-    m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
-    m_coneCollector(0,objectId) = coneDirection.azimuthAngle();
-    m_coneCollector(1,objectId) = coneDirection.zenithAngle();
+    {
+      std::lock_guard<std::mutex> lockCone(m_coneMutex);
+      //Check last timestamp if they are from same message
+      //std::cout << "Message Recieved " << std::endl;
+      m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
+      m_coneCollector(0,objectId) = coneDirection.azimuthAngle();
+      m_coneCollector(1,objectId) = coneDirection.zenithAngle();
+    }
     if (m_newFrame){
       m_newFrame = false;
       std::cout << "Test 2 " << std::endl;
-      std::thread coneCollector (&Slam::initializeCollection,this);
-      coneCollector.detach();
+      //std::thread coneCollector (&Slam::initializeCollection,this);
+      //coneCollector.detach();
+      initializeCollection();
     }
   }
 
-  if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
-    std::lock_guard<std::mutex> lockCone(m_coneMutex);
-    //std::cout << "Recieved Distance" << std::endl;
+  else if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
+    
     m_lastTimeStamp = data.sampleTimeStamp();
     auto coneDistance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
     uint32_t objectId = coneDistance.objectId();
-    m_coneCollector(2,objectId) = coneDistance.distance();
-    m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
+    {
+      std::lock_guard<std::mutex> lockCone(m_coneMutex);
+      m_coneCollector(2,objectId) = coneDistance.distance();
+      m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
+    }
     //Check last timestamp if they are from same message
     //std::cout << "Message Recieved " << std::endl;
     if (m_newFrame){
        m_newFrame = false;
-       std::thread coneCollector(&Slam::initializeCollection, this);
-       coneCollector.detach();
+       //std::thread coneCollector(&Slam::initializeCollection, this);
+       //coneCollector.detach();
+       initializeCollection();
     }
   }
 
-  if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
-    std::lock_guard<std::mutex> lockCone(m_coneMutex);
+  else if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
+    
     //std::cout << "Recieved Type" << std::endl;
     m_lastTimeStamp = data.sampleTimeStamp();
     auto coneType = cluon::extractMessage<opendlv::logic::perception::ObjectType>(std::move(data));
     uint32_t objectId = coneType.objectId();
-    m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
-    m_coneCollector(3,objectId) = coneType.type();
+    {          
+      std::lock_guard<std::mutex> lockCone(m_coneMutex);
+      m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
+      m_coneCollector(3,objectId) = coneType.type();
+    }
     //Check last timestamp if they are from same message
     //std::cout << "Message Recieved " << std::endl;
     if (m_newFrame){
       m_newFrame = false;
-      std::thread coneCollector (&Slam::initializeCollection,this); //just sleep instead maybe since this is unclear how it works
-      coneCollector.detach();
+      //std::thread coneCollector (&Slam::initializeCollection,this); //just sleep instead maybe since this is unclear how it works
+      //coneCollector.detach();
+      initializeCollection();
+
     }
   }
   
   //#########################Recieve Odometry##################################
-  if(data.dataType() == opendlv::logic::sensation::Geolocation::ID()){
+  else if(data.dataType() == opendlv::logic::sensation::Geolocation::ID()){
    
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     auto odometry = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(data));
