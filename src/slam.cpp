@@ -396,7 +396,7 @@ void Slam::optimizeGraph(){
 Eigen::MatrixXd Slam::conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   Eigen::MatrixXd xyCones = Eigen::MatrixXd::Zero(3,20);
   for(int i = 0; i<cones.cols();i++){
-    Eigen::Vector3d cone = Spherical2Cartesian(cones(0,i), cones(1,i), cones(2,i));
+    Eigen::Vector3d cone = Spherical2Cartesian(cones(0,i)+pose(2), cones(1,i), cones(2,i));
     cone(0) += pose(0);
     cone(1) += pose(1);
     xyCones(0,i) = cone(0);
@@ -407,7 +407,7 @@ Eigen::MatrixXd Slam::conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones)
 }
 
 Eigen::Vector3d Slam::coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
-  Eigen::Vector3d cone = Spherical2Cartesian(cones(0), cones(1), cones(2));
+  Eigen::Vector3d cone = Spherical2Cartesian(cones(0)+pose(2), cones(1), cones(2));
   cone(0) += pose(0);
   cone(1) += pose(1);
   cone(2) = cones(3);
@@ -516,8 +516,10 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
 Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, double distance)
 {
   //double xyDistance = distance * cos(azimuth * static_cast<double>(DEG2RAD));
-  double xData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*sin(azimuth * static_cast<double>(DEG2RAD));
-  double yData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*cos(azimuth * static_cast<double>(DEG2RAD));
+  azimuth = (azimuth > PI)?(azimuth-PI):(azimuth);
+  azimuth = (azimuth < -PI)?(azimuth+PI):(azimuth);
+  double xData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*cos(azimuth * static_cast<double>(DEG2RAD));
+  double yData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*sin(azimuth * static_cast<double>(DEG2RAD));
   double zData = distance * sin(zenimuth * static_cast<double>(DEG2RAD));
   Eigen::MatrixXd recievedPoint = Eigen::Vector3d::Zero();
   recievedPoint << xData,

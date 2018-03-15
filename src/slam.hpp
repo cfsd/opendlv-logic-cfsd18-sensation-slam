@@ -116,6 +116,7 @@ public:
     // Constants for degree transformation
   const double DEG2RAD = 0.017453292522222; // PI/180.0
   const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;
+  const double PI = 3.14159265;
 };
 
 
