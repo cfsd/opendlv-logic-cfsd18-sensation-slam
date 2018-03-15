@@ -35,12 +35,15 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments) :
 , m_gpsReference()
 , m_map()
 , m_keyframeTimeStamp()
+, m_sendPose()
+, m_sendMutex()
 {
   setupOptimizer();
   setUp(commandlineArguments);
   m_coneCollector = Eigen::MatrixXd::Zero(4,20);
   m_lastObjectId = 0;
   m_odometryData << 0,0,0;
+  m_sendPose << 0,0,0;
 }
 
 void Slam::setupOptimizer(){
@@ -225,15 +228,15 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   std::cout << "Adding cones to map" << std::endl;
 
   {
-  std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
-  addPoseToGraph(pose);
+    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+    addPoseToGraph(pose);
   }
   //Maybe add m_loopClosingComplete check here
 
   if(!m_loopClosingComplete){
 
 
-    std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
+    //std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
     addConesToMap(cones,pose);
 
   }
@@ -253,22 +256,24 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
 
   //Use current pose to evaluate which cones you see
- Eigen::MatrixXd coneObservedGlobal = conesToGlobal(pose, cones);
  Eigen::Vector2d errorDistance;
  errorDistance << 0,0;
  uint32_t amountOfConesReobserved = 0;
- uint32_t j = 0;
- bool coneFound = false;
  //Find local cone ID by iterate through map
-
+ double minDistance = 100;
+ uint32_t currentConeIndex;
+ 
   for(uint32_t i = 0; i < cones.cols(); i++){
+  Eigen::Vector3d coneObservedGlobal = coneToGlobal(pose, cones.col(i));
+  double distanceToCar = cones(2,i);
+   uint32_t j = 0;
+   bool coneFound = false;
+   std::lock_guard<std::mutex> lockMap(m_mapMutex);
+    while(!coneFound && j < m_map.size()){ //if(fabs(m_map[j].getType() - cones(3,i))<0.0001)
 
+        Cone coneEvaluatedInMap = Cone(coneObservedGlobal(0),coneObservedGlobal(1),static_cast<int>(coneObservedGlobal(2)),2000);
 
-    while(!coneFound && j < m_map.size()){
-
-        Cone coneEvaluatedInMap = Cone(coneObservedGlobal(0,i),coneObservedGlobal(1,i),0,2000);
-
-        if(distanceBetweenCones(m_map[j],coneEvaluatedInMap) < 1){
+        if(distanceBetweenCones(m_map[j],coneEvaluatedInMap) < 1 && (m_map[j].getType() - coneEvaluatedInMap.getType())<0.0001){
 
 
           //Non graph localizer
@@ -283,6 +288,10 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
           std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
           addConeMeasurement(m_map[j], pose);
 
+            if(distanceToCar<minDistance){//Update current cone to know where in the map we are
+              currentConeIndex = j;
+              minDistance = distanceToCar;
+            }
       }
 
     j++;
@@ -290,7 +299,12 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
 
  }
 
+  
 
+    m_sendConeData = (currentConeIndex != m_currentConeIndex);
+
+    m_currentConeIndex = currentConeIndex;
+ 
   //Non grapher
   errorDistance(0) = errorDistance(0)/amountOfConesReobserved;
   errorDistance(1) = errorDistance(1)/amountOfConesReobserved;
@@ -298,9 +312,9 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   pose = updatePose(pose, errorDistance);
 
   {
-    std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
-    m_odometryData(0) = pose(0);
-    m_odometryData(1) = pose(1);
+    std::lock_guard<std::mutex> lockSend(m_sendMutex);
+    m_sendPose = pose;
+    m_sendPoseData = true;
   }
   //Graph
 
@@ -309,10 +323,12 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   Eigen::Vector3d updatedPoseVectorGraph = updatePoseFromGraph();
 
   {
-    std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
-    m_odometryData(0) = updatedPoseVectorGraph(0);
-    m_odometryData(1) = updatedPoseVectorGraph(1);
+    std::lock_guard<std::mutex> lockSend(m_sendMutex);
+    m_sendPose = updatedPoseVectorGraph;
+    m_sendPoseData = true;
   }
+
+
   //UPDATE POSE FROM VERTEX
 
   //Send this back to the UKF for better predications in next iteration ?!?
@@ -519,9 +535,10 @@ std::pair<bool,std::vector<Slam::ConePackage>> Slam::getCones()
   }
     Eigen::Vector3d pose;
   {
-    std::lock_guard<std::mutex> lockSensor(m_sensorMutex); 
-    pose = m_odometryData;
+    std::lock_guard<std::mutex> lockSend(m_sendMutex); 
+    pose = m_sendPose;
   }//mapmutex too
+  std::lock_guard<std::mutex> lockMap(m_mapMutex);
   for(uint32_t i = 0; i<m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
     int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
@@ -545,15 +562,15 @@ std::pair<bool,opendlv::logic::sensation::Geolocation> Slam::getPose(){
     return std::pair<bool,opendlv::logic::sensation::Geolocation>(false,poseMessage);
   }
 
-  std::lock_guard<std::mutex> lockSensor(m_sensorMutex); 
+  std::lock_guard<std::mutex> lockSend(m_sendMutex); 
 
   std::array<double,2> cartesianPos;
-  cartesianPos[0] = m_odometryData(0);
-  cartesianPos[1] = m_odometryData(1);
+  cartesianPos[0] = m_sendPose(0);
+  cartesianPos[1] = m_sendPose(1);
   std::array<double,2> sendGPS = wgs84::fromCartesian(m_gpsReference, cartesianPos);
   poseMessage.longitude(static_cast<float>(sendGPS[0]));
   poseMessage.latitude(static_cast<float>(sendGPS[1]));
-  poseMessage.heading(static_cast<float>(m_odometryData(2)));
+  poseMessage.heading(static_cast<float>(m_sendPose(2)));
 
   return std::pair<bool,opendlv::logic::sensation::Geolocation>(true,poseMessage);
 

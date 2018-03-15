@@ -49,7 +49,7 @@ void sendCones(std::vector<ConePackage> cones,cluon::OD4Session &od4, uint32_t c
 int32_t main(int32_t argc, char **argv) {
   int32_t retCode{0};
   std::map<std::string, std::string> commandlineArguments = cluon::getCommandlineArguments(argc, argv);
-  if (commandlineArguments.count()<10) {
+  if (commandlineArguments.size()<10) {
     std::cerr << argv[0] << " is a slam implementation for the CFSD18 project." << std::endl;
     std::cerr << "Usage:   " << argv[0] << " --cid=<OpenDaVINCI session> [--id=<Identifier in case of simulated units>] [--verbose] [Module specific parameters....]" << std::endl;
     std::cerr << "Example: " << argv[0] << "--cid=111 --id=120 --detectConeId=118 --estimationId=114 --gatheringTimeMs=10 --sameConeThreshold=1.2 --refLatitude=48.123141 --refLongitude=12.34534 --timeBetweenKeyframes=0.5 --coneMappingThreshold=50 --conesPerPacket=20" <<  std::endl;

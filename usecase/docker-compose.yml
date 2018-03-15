@@ -11,7 +11,7 @@ services:
         image: "graphslam:graphslamv0.0.1"
         network_mode: "host"
         ipc: host
-        command: "/usr/bin/opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=118 --estimationId=114 --gatheringTimeMs=10 --sameConeThreshold=1.2 --refLatitude=48.123141 --refLongitude=12.34534 --timeBetweenKeyframes=0.5 --coneMappingThreshold=50 --conesPerPacket=20"
+        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=114 --gatheringTimeMs=10 --sameConeThreshold=1.2 --refLatitude=48.123141 --refLongitude=12.34534 --timeBetweenKeyframes=0.5 --coneMappingThreshold=50 --conesPerPacket=20"
     odcockpit:
         image: ${IMAGE}
         network_mode: host
@@ -26,3 +26,24 @@ services:
         depends_on:
             - odsupercomponent
         command: "/opt/od4/bin/odcockpit --cid=${CID}"
+    #Cone detection
+    cfsd18-sensation-attention:
+        image: "seresearch/opendlv-cfsd18-on-opendlv-lynx-on-opendlv-on-opendlv-core-on-opendavinci-on-base-dev:latest"
+        network_mode: "host"
+        ipc: host
+        user: odv
+        depends_on:
+            - odsupercomponent
+        command: "/opt/opendlv.cfsd18/bin/opendlv-logic-cfsd18-sensation-attention --cid=${CID} --verbose=1 --id=1"
+    #proxy-velodyne16
+    velodyne16:
+        image: ${IMAGE}
+        network_mode: "host"
+        volumes:
+        - .:/opt/opendlv.data
+        ipc: host
+        user: odv
+        working_dir: "/opt/opendlv.data"
+        depends_on:
+            - odsupercomponent
+        command: "/opt/opendlv.core/bin/opendlv-core-system-proxy-velodyne16 --cid=${CID}"
