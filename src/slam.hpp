@@ -106,7 +106,7 @@ public:
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
-  bool m_newFrame = true;
+  bool m_newFrame;
   bool m_loopClosing = false;
   bool m_loopClosingComplete = false;
   Eigen::Vector3d m_sendPose;
