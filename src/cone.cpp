@@ -35,7 +35,7 @@ opendlv::logic::perception::ObjectDirection Cone::getDirection(Eigen::Vector3d p
   double x = m_x-pose(0);
   double y = m_y-pose(1);
   double heading = pose(2);
-  double azimuthAngle = atan(y/x)*static_cast<double>(RAD2DEG);
+  double azimuthAngle = atan2(y,x)*static_cast<double>(RAD2DEG);
   azimuthAngle = azimuthAngle-heading;
   opendlv::logic::perception::ObjectDirection direction;
   direction.zenithAngle(0);

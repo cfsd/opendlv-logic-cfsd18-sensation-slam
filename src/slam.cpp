@@ -161,8 +161,8 @@ void Slam::nextContainer(cluon::data::Envelope data)
 
     std::array<double,2> WGS84ReadingTemp;
 
-    WGS84ReadingTemp[0] = longitude;
-    WGS84ReadingTemp[1] = latitude;
+    WGS84ReadingTemp[0] = latitude;
+    WGS84ReadingTemp[1] = longitude;
 
     std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
     //opendlv::data::environment::WGS84Coordinate gpsCurrent = opendlv::data::environment::WGS84Coordinate(latitude, longitude);
