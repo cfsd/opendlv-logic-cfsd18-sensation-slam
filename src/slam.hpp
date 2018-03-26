@@ -84,7 +84,7 @@ public:
 
 
 
-/*Member variables*/
+  /*Member variables*/
   g2o::SparseOptimizer m_optimizer;
   int32_t m_timeDiffMilliseconds = 110;
   cluon::data::TimeStamp m_lastTimeStamp;
