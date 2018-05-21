@@ -14,13 +14,15 @@
 class Drawer{
     public:
         Drawer(std::map<std::string,std::string> commandlineArgs, Slam &slam);
-        //void drawRawPoints();
-        //void drawROIPoints();
-        //void drawRANSACPoints();
-        //void drawCones();
+        void drawPoses();
+        void drawCones();
+        void drawCurrentPose();
 
     private:
         Slam& slam;
+        std::vector<Cone> m_cones = {};
+        std::vector<Eigen::Vector3d> m_poses = {};
+        Eigen::Vector3d m_pose = {};
 
 };
 #endif

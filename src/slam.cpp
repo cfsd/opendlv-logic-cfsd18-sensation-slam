@@ -64,7 +64,6 @@ void Slam::setupOptimizer(){
 
 void Slam::nextCone(cluon::data::Envelope data)
 {
-
   //#####################Recieve Landmarks###########################
   if (data.dataType() == opendlv::logic::perception::ObjectDirection::ID()) {
     //std::cout << "Recieved Direction" << std::endl;
@@ -256,31 +255,22 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   {
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     pose = m_odometryData;
+    m_poses.push_back(pose);
   }
   std::cout << "Adding cones to map" << std::endl;
-
   {
     std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
     addPoseToGraph(pose);
   }
   //Maybe add m_loopClosingComplete check here
-
   if(!m_loopClosingComplete){
-
-
     //std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
     addConesToMap(cones,pose);
-
   }
-
-
   if(m_loopClosingComplete && cones.cols() > 1){ //Use minimum of two cones for robustness
-
     localizer(pose, cones);
-
   }
   //Tracker
-
   //Reobserver idea, when not adding cones to map, a new function can be used
   //To check current observed cones, and adding new current odometry to these
 }
@@ -350,23 +340,22 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   std::lock_guard<std::mutex> lockOptimizer(m_optimizerMutex);
   optimizeGraph();
   Eigen::Vector3d updatedPoseVectorGraph = updatePoseFromGraph();
-
   {
     std::lock_guard<std::mutex> lockSend(m_sendMutex);
     m_sendPose = updatedPoseVectorGraph;
     m_sendPoseData = true;
   }
+  sendPose();
+  sendCones();
   //UPDATE POSE FROM VERTEX
   //Send this back to the UKF for better predications in next iteration ?!?
 }
 
 Eigen::Vector3d Slam::updatePoseFromGraph(){
 
-
   g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(m_poseId));
   g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
   Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
-
   return updatedPose;
 }
 
@@ -655,6 +644,28 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   //m_gpsReference = opendlv::data::environment::WGS84Coordinate(latitude,longitude);
   
 }
+
+std::vector<Eigen::Vector3d> Slam::drawPoses(){
+  std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+  return m_poses;
+}
+
+std::vector<Cone> Slam::drawCones(){
+  std::lock_guard<std::mutex> lock(m_mapMutex);
+  return m_map;
+}
+
+Eigen::Vector3d Slam::drawCurrentPose(){
+  if(m_loopClosingComplete){
+    std::lock_guard<std::mutex> lock(m_sendMutex);
+    return m_sendPose;
+  }
+  else{
+    std::lock_guard<std::mutex> lock(m_sensorMutex);
+    return m_odometryData;
+  }
+}
+
 
 void Slam::tearDown()
 {

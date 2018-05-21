@@ -13,7 +13,7 @@ Viewer::Viewer(std::map<std::string,std::string> commandlineArgs, Drawer &drawer
 }
 
 void Viewer::Run(){
-    pangolin::CreateWindowAndBind("LiDAR Viewer",1024,768);
+    pangolin::CreateWindowAndBind("SLAM Viewer",1024,768);
 
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
@@ -22,10 +22,9 @@ void Viewer::Run(){
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     pangolin::CreatePanel("menu").SetBounds(0.0,1.0,0.0,pangolin::Attach::Pix(175));
-    pangolin::Var<bool> menuShowRawPoints("menu.ShowRawPoints",true,true);
-    pangolin::Var<bool> menuShowROIPoints("menu.ShowROI",true,true);
-    pangolin::Var<bool> menuShowRANSACPoints("menu.ShowRANSAC",true,true);
-    pangolin::Var<bool> menuShowCones("menu.Show Cones",true,true);
+    pangolin::Var<bool> menuShowCones("menu.ShowCones",true,true);
+    pangolin::Var<bool> menuShowPoses("menu.ShowPoses",true,true);
+    pangolin::Var<bool> menuShowCurrentPose("menu.ShowCurrentPose",true,true);
     pangolin::Var<bool> menuExit("menu.Exit",false,false);
 
     pangolin::OpenGlRenderState s_cam(
@@ -44,16 +43,13 @@ void Viewer::Run(){
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         d_cam.Activate(s_cam);
         glClearColor(1.0f,1.0f,1.0f,1.0f);
-        /*m_drawer.drawCurrentCar(Twc);
-        if(menuShowRawPoints)
-            m_drawer.drawRawPoints();
-        if(menuShowROIPoints)
-            m_drawer.drawROIPoints();
-        if(menuShowRANSACPoints)
-            m_drawer.drawRANSACPoints();
+        //m_drawer.drawCurrentCar(Twc);
         if(menuShowCones)
             m_drawer.drawCones();
-        */
+        if(menuShowPoses)
+            m_drawer.drawPoses();
+        if(menuShowCurrentPose)
+            m_drawer.drawCurrentPose();
         pangolin::FinishFrame();
 
         if(menuExit)

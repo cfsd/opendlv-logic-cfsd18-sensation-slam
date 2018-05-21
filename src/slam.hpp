@@ -54,8 +54,9 @@ public:
   ~Slam() = default;
   void nextCone(cluon::data::Envelope data);
   void nextPose(cluon::data::Envelope data);
-  void sendCones();
-  void sendPose();
+  std::vector<Cone> drawCones();
+  std::vector<Eigen::Vector3d> drawPoses();
+  Eigen::Vector3d drawCurrentPose();
   
 
  private:
@@ -81,6 +82,8 @@ public:
   bool loopClosing(Cone cone);
   double distanceBetweenCones(Cone c1, Cone c2);
   void updateMap();
+  void sendCones();
+  void sendPose();
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -99,6 +102,7 @@ public:
   Eigen::Vector3d m_odometryData;
   std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
+  std::vector<Eigen::Vector3d> m_poses = {};
   double m_newConeThreshold= 1;
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
