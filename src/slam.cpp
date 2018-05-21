@@ -22,8 +22,9 @@
 #include "slam.hpp"
 #include "WGS84toCartesian.hpp"
 
-Slam::Slam(std::map<std::string, std::string> commandlineArguments) :
-  m_optimizer()
+Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Session &a_od4) :
+  od4(a_od4)
+, m_optimizer()
 , m_lastTimeStamp()
 , m_coneCollector()
 , m_lastObjectId()
@@ -61,11 +62,9 @@ void Slam::setupOptimizer(){
   std::cout << "test test" << std::endl;
 }
 
-void Slam::nextContainer(cluon::data::Envelope data)
+void Slam::nextCone(cluon::data::Envelope data)
 {
-  //std::cout << "This is slam slamming" << std::endl;
-  
-  //All the ifs need sender stamp checks to make sure the data is from detectcone
+
   //#####################Recieve Landmarks###########################
   if (data.dataType() == opendlv::logic::perception::ObjectDirection::ID()) {
     //std::cout << "Recieved Direction" << std::endl;
@@ -147,33 +146,32 @@ void Slam::nextContainer(cluon::data::Envelope data)
 
     }
   }
+
+}
+
+void Slam::nextPose(cluon::data::Envelope data){
+    //#########################Recieve Odometry##################################
   
-  //#########################Recieve Odometry##################################
-  else if(data.dataType() == opendlv::logic::sensation::Geolocation::ID()){
-   
-    std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
-    auto odometry = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(data));
+  std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+  auto odometry = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(data));
 
-    double longitude = odometry.longitude();
-    double latitude = odometry.latitude();
+  double longitude = odometry.longitude();
+  double latitude = odometry.latitude();
 
-    //toCartesian(const std::array<double, 2> &WGS84Reference, const std::array<double, 2> &WGS84Position)
+  //toCartesian(const std::array<double, 2> &WGS84Reference, const std::array<double, 2> &WGS84Position)
 
-    std::array<double,2> WGS84ReadingTemp;
+  std::array<double,2> WGS84ReadingTemp;
 
-    WGS84ReadingTemp[0] = latitude;
-    WGS84ReadingTemp[1] = longitude;
+  WGS84ReadingTemp[0] = latitude;
+  WGS84ReadingTemp[1] = longitude;
 
-    std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
-    //opendlv::data::environment::WGS84Coordinate gpsCurrent = opendlv::data::environment::WGS84Coordinate(latitude, longitude);
-    //opendlv::data::environment::Point3 gpsTransform = m_gpsReference.transform(gpsCurrent);
+  std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
+  //opendlv::data::environment::WGS84Coordinate gpsCurrent = opendlv::data::environment::WGS84Coordinate(latitude, longitude);
+  //opendlv::data::environment::Point3 gpsTransform = m_gpsReference.transform(gpsCurrent);
 
-    m_odometryData << WGS84Reading[0],
-                      WGS84Reading[1],
-                      odometry.heading();
-  }
-
-
+  m_odometryData << WGS84Reading[0],
+                    WGS84Reading[1],
+                    odometry.heading();
 }
 
 void Slam::initializeCollection(){
@@ -332,9 +330,6 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   }
 
  }
-
-  
-
     m_sendConeData = (currentConeIndex != m_currentConeIndex);
 
     m_currentConeIndex = currentConeIndex;
@@ -361,10 +356,7 @@ void Slam::localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones){
     m_sendPose = updatedPoseVectorGraph;
     m_sendPoseData = true;
   }
-
-
   //UPDATE POSE FROM VERTEX
-
   //Send this back to the UKF for better predications in next iteration ?!?
 }
 
@@ -550,8 +542,8 @@ void Slam::addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose){//Matches 
 Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, double distance)
 {
   //double xyDistance = distance * cos(azimuth * static_cast<double>(DEG2RAD));
-  azimuth = (azimuth > PI)?(azimuth-PI):(azimuth);
-  azimuth = (azimuth < -PI)?(azimuth+PI):(azimuth);
+  azimuth = (azimuth > PI)?(azimuth-2*PI):(azimuth);
+  azimuth = (azimuth < -PI)?(azimuth+2*PI):(azimuth);
   double xData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*cos(azimuth * static_cast<double>(DEG2RAD));
   double yData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*sin(azimuth * static_cast<double>(DEG2RAD));
   double zData = distance * sin(zenimuth * static_cast<double>(DEG2RAD));
@@ -562,42 +554,33 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
   return recievedPoint;
 }
 
-std::pair<bool,std::vector<Slam::ConePackage>> Slam::getCones()
+void Slam::sendCones()
 {
-  std::vector<ConePackage> v_conePackage;
-  if(!m_sendConeData){ //When do we want to send cones
-    std::cout << m_map.size() << std::endl;
-    return std::pair<bool,std::vector<Slam::ConePackage>>(false,v_conePackage); //If we do not want to send cones, return this
-  }
-    Eigen::Vector3d pose;
+  Eigen::Vector3d pose;
   {
     std::lock_guard<std::mutex> lockSend(m_sendMutex); 
     pose = m_sendPose;
   }//mapmutex too
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
+  std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
+  cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
   for(uint32_t i = 0; i<m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
     int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
     directionMsg.objectId(i);
+    od4.send(directionMsg,sampleTime,m_senderStamp);
     opendlv::logic::perception::ObjectDistance distanceMsg = m_map[index].getDistance(pose); //Extract cone distance
     distanceMsg.objectId(i);
+    od4.send(distanceMsg,sampleTime,m_senderStamp);
     opendlv::logic::perception::ObjectType typeMsg;
     typeMsg.type(m_map[index].getType()); //Extract cone type
     typeMsg.objectId(i);
-    Slam::ConePackage conePackage = Slam::ConePackage(directionMsg,distanceMsg,typeMsg); //Combine all three messages into a cone package
-    v_conePackage.push_back(conePackage); //Add current cone package to a vector of cone packages
+    od4.send(typeMsg,sampleTime,m_senderStamp);
   }
-  std::pair<bool,std::vector<Slam::ConePackage>> retVal = std::pair<bool,std::vector<ConePackage>>(true,v_conePackage); //Insert into a pair object, check if data is recived and stores current cone package
-  m_sendConeData = false;
-  return retVal;
 }
 
-std::pair<bool,opendlv::logic::sensation::Geolocation> Slam::getPose(){
+void Slam::sendPose(){
   opendlv::logic::sensation::Geolocation poseMessage;
-  if(!m_sendPoseData){
-    return std::pair<bool,opendlv::logic::sensation::Geolocation>(false,poseMessage);
-  }
-
   std::lock_guard<std::mutex> lockSend(m_sendMutex); 
 
   std::array<double,2> cartesianPos;
@@ -607,36 +590,25 @@ std::pair<bool,opendlv::logic::sensation::Geolocation> Slam::getPose(){
   poseMessage.longitude(static_cast<float>(sendGPS[0]));
   poseMessage.latitude(static_cast<float>(sendGPS[1]));
   poseMessage.heading(static_cast<float>(m_sendPose(2)));
-
-  return std::pair<bool,opendlv::logic::sensation::Geolocation>(true,poseMessage);
-
+  std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
+  cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
+  od4.send(poseMessage,sampleTime,m_senderStamp);
 }
 
 bool Slam::loopClosing(Cone cone){
-
   //Eigen::Vector2d initialCone;
   //initialCone << m_map[0].getX(),m_map[0].getY();
-
   double loopClosingCandidateDistance = distanceBetweenCones(m_map[0], cone);
-
   //std::sqrt( (initialCone(0)-cone.getX())*(initialCone(0)-cone.getX()) + (initialCone(1)-cone.getY())*(initialCone(1)-cone.getY()));
   if(loopClosingCandidateDistance < 1 && m_currentConeIndex > 20){ //Set threshold in congig ??
-
     return true;
-
   } 
-
   return false;
 }
 
 double Slam::distanceBetweenCones(Cone c1, Cone c2){
-
-
   double distance = std::sqrt( (c1.getX()-c2.getX())*(c1.getX()-c2.getX()) + (c1.getY()-c2.getY())*(c1.getY()-c2.getY()) );
-
   return distance;
-
-
 }
 
 void Slam::updateMap(){
@@ -673,6 +645,7 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   m_coneMappingThreshold = static_cast<double>(std::stod(configuration["coneMappingThreshold"]));
   m_conesPerPacket = static_cast<int>(std::stoi(configuration["conesPerPacket"]));
   std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
+  m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
   //auto kv = getKeyValueConfiguration();
   //m_timeDiffMilliseconds = kv.getValue<double>("logic-cfsd18-perception-detectcone.timeDiffMilliseconds");
   //m_newConeThreshold = kv.getValue<double>("logic-cfsd18-sensation-slam.newConeLimit");

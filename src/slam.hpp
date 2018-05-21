@@ -50,11 +50,12 @@ private:
  Slam &operator=(Slam &&) = delete;
  typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 public:
-  Slam(std::map<std::string, std::string> commandlineArguments);
+  Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Session &a_od4);
   ~Slam() = default;
-  void nextContainer(cluon::data::Envelope data);
-  std::pair<bool,std::vector<ConePackage>> getCones();
-  std::pair<bool,opendlv::logic::sensation::Geolocation> getPose();
+  void nextCone(cluon::data::Envelope data);
+  void nextPose(cluon::data::Envelope data);
+  void sendCones();
+  void sendPose();
   
 
  private:
@@ -85,6 +86,7 @@ public:
 
 
   /*Member variables*/
+  cluon::OD4Session &od4;
   g2o::SparseOptimizer m_optimizer;
   int32_t m_timeDiffMilliseconds = 110;
   cluon::data::TimeStamp m_lastTimeStamp;
@@ -111,6 +113,7 @@ public:
   bool m_loopClosingComplete = false;
   Eigen::Vector3d m_sendPose;
   std::mutex m_sendMutex;
+  uint32_t m_senderStamp = 0;
   
 
     // Constants for degree transformation

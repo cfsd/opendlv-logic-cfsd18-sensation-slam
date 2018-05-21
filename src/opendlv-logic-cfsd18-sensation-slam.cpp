@@ -55,33 +55,40 @@ int32_t main(int32_t argc, char **argv) {
     std::cerr << "Example: " << argv[0] << "--cid=111 --id=120 --detectConeId=118 --estimationId=114 --gatheringTimeMs=10 --sameConeThreshold=1.2 --refLatitude=48.123141 --refLongitude=12.34534 --timeBetweenKeyframes=0.5 --coneMappingThreshold=50 --conesPerPacket=20" <<  std::endl;
     retCode = 1;
   } else {
-    uint32_t const ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
+    //uint32_t const ID{(commandlineArguments["id"].size() != 0) ? static_cast<uint32_t>(std::stoi(commandlineArguments["id"])) : 0};
     bool const VERBOSE{commandlineArguments.count("verbose") != 0};
     g2o::SparseOptimizer optimizer;
     (void)VERBOSE;
     // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
     cluon::data::Envelope data;
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
-    Slam slam(commandlineArguments);
-    cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"])),
-      [&data, &slammer = slam, &od4session = od4, senderStamp = ID, &configuration = commandlineArguments](cluon::data::Envelope &&envelope){
-        uint32_t detectconeStamp = static_cast<uint32_t>(std::stoi(configuration["detectConeId"]));
-        uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(configuration["estimationId"]));
-        if(envelope.senderStamp() == detectconeStamp || envelope.senderStamp() == estimationStamp){
-          slammer.nextContainer(envelope);
-          std::pair<bool,std::vector<ConePackage>> conePacket = slammer.getCones();
-          if(conePacket.first){
-            sendCones(conePacket.second,od4session,senderStamp);
-          }
-          std::pair<bool,opendlv::logic::sensation::Geolocation> posePacket = slammer.getPose();
-          if(posePacket.first){
-            std::chrono::system_clock::time_point tp;
-            cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
-            od4session.send(posePacket.second,sampleTime,senderStamp);
-          }
-        }  
+    cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+    Slam slam(commandlineArguments,od4);
+    uint32_t detectconeStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["detectConeId"]));
+    uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["estimationId"]));
+
+
+    auto poseEnvelope{[&slammer = slam,senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
+      {
+        if(envelope.senderStamp() == senderStamp){
+          slammer.nextPose(envelope);
+        }
+      } 
+    };
+
+    auto coneEnvelope{[&slammer = slam, senderStamp = detectconeStamp](cluon::data::Envelope &&envelope)
+      {
+        if(envelope.senderStamp() == senderStamp){
+          slammer.nextCone(envelope);
+        }
       }
     };
+
+    od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(),poseEnvelope);
+    od4.dataTrigger(opendlv::logic::perception::ObjectDirection::ID(),coneEnvelope);
+    od4.dataTrigger(opendlv::logic::perception::ObjectDistance::ID(),coneEnvelope);
+    od4.dataTrigger(opendlv::logic::perception::ObjectType::ID(),coneEnvelope);
+    
 
     // Just sleep as this microservice is data driven.
     using namespace std::literals::chrono_literals;
