@@ -243,7 +243,7 @@ bool Slam::CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp){
 
 bool Slam::isKeyframe(cluon::data::TimeStamp startTime){
 
-  double timeElapsed = abs(static_cast<double>(m_keyframeTimeStamp.microseconds()-startTime.microseconds())/1000.0);
+  double timeElapsed = fabs(static_cast<double>(m_keyframeTimeStamp.microseconds()-startTime.microseconds())/1000.0);
   std::cout << "Time ellapsed is: " << timeElapsed << std::endl;
   if(timeElapsed>m_timeBetweenKeyframes){//Keyframe candidate is based on time difference from last keyframe
     m_keyframeTimeStamp = startTime;
