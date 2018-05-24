@@ -16,8 +16,8 @@ void Drawer::drawCones(){
     }    
     glBegin(GL_POINTS);
     for(uint32_t i = 0; i<nPoints; i++){
-        float x = static_cast<float>(m_cones[i].getX());
-        float y = static_cast<float>(m_cones[i].getY());
+        float x = static_cast<float>(m_cones[i].getX()/5);
+        float y = static_cast<float>(m_cones[i].getY()/5);
         float z = 0.0f;
         if(m_cones[i].getType() == 1){
             glColor3f(1.0,1.0,0.0);//yellow
@@ -54,8 +54,8 @@ void Drawer::drawPoses(){
     glBegin(GL_POINTS);
     glColor3f(1.0,0.0,0.0);
     for(uint32_t i = 0; i<nPoints; i++){
-        float x = static_cast<float>(m_poses[i](0));
-        float y = static_cast<float>(m_poses[i](1));
+        float x = static_cast<float>(m_poses[i](0)/5);
+        float y = static_cast<float>(m_poses[i](1)/5);
         float z = 0.0f;
         glVertex3f(x,y,z);
     }
@@ -73,10 +73,12 @@ void Drawer::drawCurrentPose(){
     glBegin(GL_POINTS);
     glColor3f(1.0,0.0,0.0);
     for(uint32_t i = 0; i<nPoints; i++){
-        float x = static_cast<float>(m_pose(0));
-        float y = static_cast<float>(m_pose(1));
+        float x = static_cast<float>(m_pose(0)/5);
+        float y = static_cast<float>(m_pose(1)/5);
         float z = 0.0f;
         glVertex3f(x,y,z);
+        glColor3f(0.0,1.0,0.0);
+        glVertex3f(x+static_cast<float>(2*cos(m_pose(2))/5),y+static_cast<float>(2*sin(m_pose(2))/5),z);
     }
     glEnd();
 }

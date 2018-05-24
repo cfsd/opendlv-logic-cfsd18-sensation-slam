@@ -68,6 +68,8 @@ int32_t main(int32_t argc, char **argv) {
     Slam slam(commandlineArguments,od4);
     Drawer drawer(commandlineArguments,slam);
     Viewer viewer(commandlineArguments,drawer);
+    std::thread viewThread (&Viewer::Run,viewer); 
+
     uint32_t detectconeStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["detectConeId"]));
     uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["estimationId"]));
 
@@ -87,12 +89,20 @@ int32_t main(int32_t argc, char **argv) {
         }
       }
     };
+    auto splitPoseEnvelope{[&slammer = slam, senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
+      {
+        if(envelope.senderStamp() == senderStamp){
+          slammer.nextSplitPose(envelope);
+        }
+      }
+    };
 
+    od4.dataTrigger(opendlv::proxy::GeodeticWgs84Reading::ID(),splitPoseEnvelope);
+    od4.dataTrigger(opendlv::proxy::GeodeticHeadingReading::ID(),splitPoseEnvelope);
     od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(),poseEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectDirection::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectDistance::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectType::ID(),coneEnvelope);
-    
 
     // Just sleep as this microservice is data driven.
     using namespace std::literals::chrono_literals;

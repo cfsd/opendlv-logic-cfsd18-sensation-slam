@@ -54,6 +54,7 @@ public:
   ~Slam() = default;
   void nextCone(cluon::data::Envelope data);
   void nextPose(cluon::data::Envelope data);
+  void nextSplitPose(cluon::data::Envelope data);
   std::vector<Cone> drawCones();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();

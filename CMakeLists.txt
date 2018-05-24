@@ -19,7 +19,7 @@ project(opendlv-logic-cfsd18-sensation-slam)
 
 ################################################################################
 # Defining the relevant versions of OpenDLV Standard Message Set and libcluon.
-set(OPENDLV_STANDARD_MESSAGE_SET opendlv-standard-message-set-v0.9.1.odvd)
+set(OPENDLV_STANDARD_MESSAGE_SET opendlv-standard-message-set-v0.9.5.odvd)
 set(CLUON_COMPLETE cluon-complete-build.hpp)
 
 ################################################################################
