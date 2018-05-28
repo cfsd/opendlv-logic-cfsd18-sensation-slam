@@ -25,6 +25,7 @@ void Viewer::Run(){
     pangolin::Var<bool> menuShowCones("menu.ShowCones",true,true);
     pangolin::Var<bool> menuShowPoses("menu.ShowPoses",true,true);
     pangolin::Var<bool> menuShowCurrentPose("menu.ShowCurrentPose",true,true);
+    pangolin::Var<bool> menuShowGraph("menu.ShowGraph",true,true);
     pangolin::Var<bool> menuExit("menu.Exit",false,false);
 
     pangolin::OpenGlRenderState s_cam(
@@ -50,6 +51,8 @@ void Viewer::Run(){
             m_drawer.drawPoses();
         if(menuShowCurrentPose)
             m_drawer.drawCurrentPose();
+        if(menuShowGraph)
+            m_drawer.drawGraph();
         pangolin::FinishFrame();
 
         if(menuExit)

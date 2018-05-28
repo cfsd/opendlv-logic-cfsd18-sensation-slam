@@ -17,6 +17,7 @@ class Drawer{
         void drawPoses();
         void drawCones();
         void drawCurrentPose();
+        void drawGraph();
 
     private:
         Slam& slam;

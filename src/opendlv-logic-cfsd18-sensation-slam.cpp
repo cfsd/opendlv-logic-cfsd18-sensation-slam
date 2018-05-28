@@ -92,9 +92,17 @@ int32_t main(int32_t argc, char **argv) {
       }
     };
 
+    auto yawRateEnvelope{[&slammer = slam, senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
+      {
+        if(envelope.senderStamp() == senderStamp){
+          slammer.nextYawRate(envelope);
+        }
+      }
+    };
     od4.dataTrigger(opendlv::proxy::GeodeticWgs84Reading::ID(),splitPoseEnvelope);
     od4.dataTrigger(opendlv::proxy::GeodeticHeadingReading::ID(),splitPoseEnvelope);
     od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(),poseEnvelope);
+    od4.dataTrigger(opendlv::proxy::AngularVelocityReading::ID(),yawRateEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectDirection::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectDistance::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectType::ID(),coneEnvelope);

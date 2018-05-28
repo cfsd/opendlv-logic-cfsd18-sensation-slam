@@ -55,9 +55,11 @@ public:
   void nextCone(cluon::data::Envelope data);
   void nextPose(cluon::data::Envelope data);
   void nextSplitPose(cluon::data::Envelope data);
+  void nextYawRate(cluon::data::Envelope data);
   std::vector<Cone> drawCones();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
+  std::vector<std::vector<int>> drawGraph();
   
 
  private:
@@ -75,12 +77,14 @@ public:
   void performSLAM(Eigen::MatrixXd Cones);
   Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
+
+  Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
   void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void addConeMeasurement(Cone cone, Eigen::Vector3d measurement);
   void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
   void initializeCollection();
-  bool loopClosing(Cone cone);
+  bool loopClosing(Cone cone,double distance2car);
   double distanceBetweenCones(Cone c1, Cone c2);
   void updateMap();
   void sendCones();
@@ -104,6 +108,7 @@ public:
   std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
   std::vector<Eigen::Vector3d> m_poses = {};
+  std::vector<std::vector<int>> m_connectivityGraph = {};
   double m_newConeThreshold= 1;
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
@@ -119,6 +124,7 @@ public:
   Eigen::Vector3d m_sendPose;
   std::mutex m_sendMutex;
   uint32_t m_senderStamp = 0;
+  double m_yawRate = 0.0;
   
 
     // Constants for degree transformation
