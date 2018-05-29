@@ -32,6 +32,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_sensorMutex()
 , m_mapMutex()
 , m_optimizerMutex()
+, m_yawMutex()
 , m_odometryData()
 , m_gpsReference()
 , m_map()
@@ -186,6 +187,7 @@ void Slam::nextPose(cluon::data::Envelope data){
     //#########################Recieve Odometry##################################
   
   std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+  m_geolocationReceivedTime = data.sampleTimeStamp();
   auto odometry = cluon::extractMessage<opendlv::logic::sensation::Geolocation>(std::move(data));
 
   double longitude = odometry.longitude();
@@ -209,9 +211,11 @@ void Slam::nextPose(cluon::data::Envelope data){
 
 void Slam::nextYawRate(cluon::data::Envelope data){
 
-  std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+  std::lock_guard<std::mutex> lockYaw(m_yawMutex);
   auto yawRate = cluon::extractMessage<opendlv::proxy::AngularVelocityReading>(std::move(data));
-  m_yawRate = yawRate.angularVelocityZ();
+  m_yawRate = yawRate.angularVelocityZ()/4;
+   m_yawReceivedTime = data.sampleTimeStamp();
+   //std::cout << "Yaw in message: " << m_yawRate << std::endl;
 }
 
 void Slam::initializeCollection(){
@@ -244,7 +248,7 @@ void Slam::initializeCollection(){
   if(extractedCones.cols() > 0){
     //std::cout << "Extracted Cones " << std::endl;
     //std::cout << extractedCones << std::endl;
-    if(isKeyframe(m_lastTimeStamp)){//Can add check to make sure only one process is running at a time
+    if(isKeyframe()){//Can add check to make sure only one process is running at a time
       //std::cout << "Extracted Cones " << std::endl;
       //std::cout << extractedCones << std::endl;
       performSLAM(extractedCones);//Thread?
@@ -265,7 +269,7 @@ bool Slam::CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp){
       if(extractedCones.cols() > 1){
         //std::cout << "Extracted Cones " << std::endl;
         //std::cout << extractedCones << std::endl;
-        if(isKeyframe(timeStamp)){
+        if(isKeyframe()){
           std::cout << "Extracted Cones " << std::endl;
           std::cout << extractedCones << std::endl;
           performSLAM(extractedCones);//Thread?
@@ -279,9 +283,9 @@ bool Slam::CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp){
   return true;
 }
 
-bool Slam::isKeyframe(cluon::data::TimeStamp startTime){
-  startTime = cluon::time::now();
-  double timeElapsed = fabs(static_cast<double>(m_keyframeTimeStamp.microseconds()-startTime.microseconds())/1000.0);
+bool Slam::isKeyframe(){
+  cluon::data::TimeStamp startTime = cluon::time::now();
+  double timeElapsed = fabs(static_cast<double>(cluon::time::deltaInMicroseconds(m_keyframeTimeStamp,startTime)))/1000;
   std::cout << "Time ellapsed is: " << timeElapsed << std::endl;
   if(timeElapsed>m_timeBetweenKeyframes){//Keyframe candidate is based on time difference from last keyframe
     m_keyframeTimeStamp = startTime;
@@ -301,11 +305,19 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   {
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     pose = m_odometryData;
-    cluon::data::TimeStamp currentTime = cluon::time::now();
-    double timeElapsed = fabs(static_cast<double>(currentTime.microseconds()-m_lastTimeStamp.microseconds())/1000000.0);
-    pose(2) += m_yawRate*(timeElapsed);
+    //cluon::data::TimeStamp currentTime = cluon::time::now();
+    double timeElapsed = fabs(static_cast<double>(cluon::time::deltaInMicroseconds(m_yawReceivedTime, m_lastTimeStamp)))/1000000;
+
+    {
+    std::lock_guard<std::mutex> lockYaw(m_yawMutex);
+
+      std::cout << "heading: " << pose(2) <<" YawRate: " << m_yawRate << std::endl;
+      if(timeElapsed > 0 && timeElapsed < 1){
+        pose(2) = pose(2) - static_cast<double>(m_yawRate)*(timeElapsed);
+      }
+    }  
     m_poses.push_back(pose);
-    std::cout << "x: " << pose(0) << "y: " << pose(1) << std::endl;
+    std::cout << "heading: " << pose(2) << " Time: " << timeElapsed << std::endl;
   }
   std::cout << "Adding cones to map" << std::endl;
   {
@@ -441,7 +453,7 @@ void Slam::addOdometryMeasurement(Eigen::Vector3d pose){
     g2o::SE2 currentPose = g2o::SE2(pose(0), pose(1), pose(2));
     g2o::SE2 measurement = prevPose.inverse()*currentPose;
     odometryEdge->setMeasurement(measurement);
-    odometryEdge->setInformation(Eigen::Matrix3d::Identity()*10); //Actual covariance should be configured
+    odometryEdge->setInformation(Eigen::Matrix3d::Identity()*5); //Actual covariance should be configured
     m_optimizer.addEdge(odometryEdge);
   }
 }
@@ -451,6 +463,17 @@ void Slam::optimizeGraph(){
 
   g2o::VertexSE2* firstRobotPose = dynamic_cast<g2o::VertexSE2*>(m_optimizer.vertex(1000));
   firstRobotPose->setFixed(true);
+
+  g2o::VertexSE2* secondRobotPose = dynamic_cast<g2o::VertexSE2*>(m_optimizer.vertex(1001));
+  secondRobotPose->setFixed(true);
+
+  g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(0));
+  firstCone->setFixed(true);
+
+  g2o::VertexPointXY* secondCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(1));
+  secondCone->setFixed(true);
+
+
   //m_optimizer.setVerbose(true);
 
   std::cout << "Optimizing" << std::endl;
@@ -638,8 +661,8 @@ void Slam::sendCones()
     pose = m_sendPose;
   }//mapmutex too
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
-  std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
-  cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
+  //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
+  cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
   for(uint32_t i = 0; i<m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
     int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
@@ -666,15 +689,15 @@ void Slam::sendPose(){
   poseMessage.longitude(static_cast<float>(sendGPS[0]));
   poseMessage.latitude(static_cast<float>(sendGPS[1]));
   poseMessage.heading(static_cast<float>(m_sendPose(2)));
-  std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
-  cluon::data::TimeStamp sampleTime = cluon::time::convert(tp);
-  od4.send(poseMessage,sampleTime,m_senderStamp);
+  //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
+  cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
+  od4.send(poseMessage, sampleTime ,m_senderStamp);
 }
 
 bool Slam::loopClosing(Cone cone,double distance2car){
   //Eigen::Vector2d initialCone;
   //initialCone << m_map[0].getX(),m_map[0].getY();
-  double loopClosingCandidateDistance = distanceBetweenCones(m_map[9], cone);
+  double loopClosingCandidateDistance = distanceBetweenCones(m_map[0], cone);
   //std::sqrt( (initialCone(0)-cone.getX())*(initialCone(0)-cone.getX()) + (initialCone(1)-cone.getY())*(initialCone(1)-cone.getY()));
   if(loopClosingCandidateDistance < 1 && m_currentConeIndex > 20 && distance2car < m_coneMappingThreshold){ //Set threshold in congig ??
     return true;

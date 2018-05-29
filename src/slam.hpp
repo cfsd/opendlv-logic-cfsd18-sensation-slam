@@ -67,7 +67,7 @@ public:
   void setupOptimizer();
   void tearDown();
   bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
-  bool isKeyframe(cluon::data::TimeStamp startTime);
+  bool isKeyframe();
   void addOdometryMeasurement(Eigen::Vector3d pose);
   void optimizeGraph();
   void localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones);
@@ -104,6 +104,7 @@ public:
   std::mutex m_sensorMutex;
   std::mutex m_mapMutex;
   std::mutex m_optimizerMutex;
+  std::mutex m_yawMutex;
   Eigen::Vector3d m_odometryData;
   std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
@@ -124,7 +125,9 @@ public:
   Eigen::Vector3d m_sendPose;
   std::mutex m_sendMutex;
   uint32_t m_senderStamp = 0;
-  double m_yawRate = 0.0;
+  float m_yawRate = 0.0f;
+  cluon::data::TimeStamp m_yawReceivedTime = {};
+  cluon::data::TimeStamp m_geolocationReceivedTime ={};
   
 
     // Constants for degree transformation
