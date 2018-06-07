@@ -1,0 +1,33 @@
+os: linux
+language: cpp
+sudo: required
+branches:
+  only:
+  - master
+  - pre-release
+services:
+- docker
+addons:
+  apt:
+    update: true
+env:
+  global:
+  - COMMIT=${TRAVIS_COMMIT::7}
+  - DOCKERHUB='chalmersfsd'
+  - IMAGE=`echo ${TRAVIS_REPO_SLUG#*/}`
+  # DOCKER_USER
+  # DOCKER_PASS
+  - secure: cO10jELo3YlE5o3xF4wCXcCGVqtw9dclCdEwYOqNHaATY8pBNr0n8ekEJFnT7GtqIoXq0FLoHQLKFuxjLuvmd64sDj5icLK/RhDrw4NEAwt/ZI8t0vLfYx0N+g8sYmsIZncA4fUm23XTbDJ5qMvTsV4L8ocgpRtxJxMQoeWu6TF5QMozOMBpKha751wSvOWZV1NsEt/LXkdLzH2c8lK+yFz1MRaGk97Zv6IMhHkYxqOGaOT1i5vc5K0K8JciBymVATxS4cmt/FVgJxAsD3Q2QAEz3Im9kHI5UHnxoyk8CHzvBfuYhcxsV9HU84eM9kX23ItZfgJBQYMM1zF+PCtR8T/Q1TFvPSWQ8gxGBuuWf2vkcqcPtL73OvZDMnP9L9DO+qeU8yJwBJRiuf8/F+VpFLsxYBRPjSrRNN1nYEx5yaTzmcJ/a4SZ3vo56f7t6um67SEgf3p235VY9FISJSsh3YjETlKGnPKnW1RAAvlWxYvobbaAHQRvqeAm6z6yURlUzoN+f8UQ96zb19oGe+gNsJ9ilXqxibRd9ek5ucVG5ICHCNpxc+WiAwc/0LfA7EZfrMJq73l2M4RSL8WVjgbX2Tnuuo67wGlRPZehiS1k1FrV9K1rIC8+9yo7dB/Xw8OI7y9Imce/aMsuQ4r7MsGIhKUmpVCVX/FRdOO6HKAoWfQ=
+  - secure: dDmA7q6YkCF34hpNyFm6mFkO8PojUJ5MENm1rUTsxjcZHNUDdHk+yg1Ov/PDq1OCwZWNgHMk+wCPTlxIIuc4IdvnoyGcBaB6i8bLmTpq8XXlcYHCzo8jCOuoO9XcXsdsKNV54P54I1FE/7UwlTEspv8Jc/UuL8ksHWQ6XJzJV6Yf/GjL8O5lD/YhvxzO0VPJv1bqzxF7bk9/a6tp+w12EFF9uEb9f2mnKqzo+ngLjdaSWNmBmCBNfqfzJGFKljqJPRaeI1esaPl4BmhCzcPZT5m8X5hulxmoQlVFym8IdpchxrylM9vBk3sGpqcjhk+h6TBs0l73jMA/zTyGNFzoXvUnuC1q3VdbmoaPjVlmpXOrFbXiwVk7urglU8s8HNpGWsNSS5h6Mt++OjsVafVsvvhgCFo9IC4PYZUDSMY3ZnMcLHSH+2Il2yFpcphnXbEo4e8cPc0ER89/XQLSwk/sxfBauSDfs2OrvG5Ur8/I/u4/v7TLv2pCg2KtriwS3DfV950HPSr1bCOxZSYq3oQJPnB7Ute/421mCamFqNONFkBl4PujRRrIawVw12HbjNcVz86bcDpx1/2Sg39ySyloQcVf6DpexKpJeRK0rscXFFxOA654PbcT4V8xy2+bNiNji6SQscle1Ofw4WhQ46+tJ7lo/Uwete+3aBy90XOMlVA=
+install:
+- docker build -f Dockerfile.amd64 -t ${IMAGE}:${COMMIT} .
+script: skip
+after_success:
+- docker --version
+- echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+- docker tag ${IMAGE}:${COMMIT} ${DOCKERHUB}/${IMAGE}:${COMMIT}
+- docker push ${DOCKERHUB}/${IMAGE}:${COMMIT}
+notifications:
+  email:
+    on_success: never
+    on_failure: never
