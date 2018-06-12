@@ -36,7 +36,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_odometryData()
 , m_gpsReference()
 , m_map()
-, m_keyframeTimeStamp()
+, m_keyframeTimeStamp(cluon::time::now())
 , m_newFrame()
 , m_sendPose()
 , m_sendMutex()
@@ -253,6 +253,28 @@ void Slam::initializeCollection(){
       //std::cout << extractedCones << std::endl;
       performSLAM(extractedCones);//Thread?
     }
+  }
+}
+
+void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
+  m_lastTimeStamp = currentFrameTime;
+  if(isKeyframe()){
+    Eigen::MatrixXd cones = Eigen::MatrixXd::Zero(4,currentFrame.size());
+    std::map<int,ConePackage>::iterator it;
+    int coneIndex = 0;
+    it =currentFrame.begin();
+    while(it != currentFrame.end()){
+      auto direction = std::get<0>(it->second);
+      auto distance = std::get<1>(it->second);
+      auto type = std::get<2>(it->second);
+      cones(0,coneIndex) = direction.azimuthAngle();
+      cones(1,coneIndex) = direction.zenithAngle();
+      cones(2,coneIndex) = distance.distance();
+      cones(3,coneIndex) = type.type();
+      coneIndex++;
+      it++;
+    }
+    performSLAM(cones);
   }
 }
 

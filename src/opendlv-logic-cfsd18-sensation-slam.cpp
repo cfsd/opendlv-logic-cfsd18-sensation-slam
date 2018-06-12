@@ -21,6 +21,7 @@
 #include "g2o/solvers/eigen/linear_solver_eigen.h"
 #include "slam.hpp"
 #include "cone.hpp"
+#include "collector.hpp"
 #include <Eigen/Dense>
 
 #include <cstdint>
@@ -64,6 +65,8 @@ int32_t main(int32_t argc, char **argv) {
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
     Slam slam(commandlineArguments,od4);
+    int gatheringTimeMs = (commandlineArguments.count("gatheringTimeMs")>0)?(std::stoi(commandlineArguments["gatheringTimeMs"])):(10);
+    Collector collector(slam,gatheringTimeMs,3);
     uint32_t detectconeStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["detectConeId"]));
     uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["estimationId"]));
 
@@ -76,10 +79,11 @@ int32_t main(int32_t argc, char **argv) {
       } 
     };
 
-    auto coneEnvelope{[&slammer = slam, senderStamp = detectconeStamp](cluon::data::Envelope &&envelope)
+    auto coneEnvelope{[&slammer = slam, senderStamp = detectconeStamp,&collector](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == senderStamp){
-          slammer.nextCone(envelope);
+          collector.CollectCones(envelope);
+          //slammer.nextCone(envelope);
         }
       }
     };

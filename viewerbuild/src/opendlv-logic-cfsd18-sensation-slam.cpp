@@ -23,6 +23,7 @@
 #include "cone.hpp"
 #include "drawer.hpp"
 #include "viewer.hpp"
+#include "collector.hpp"
 #include <Eigen/Dense>
 
 #include <cstdint>
@@ -66,6 +67,8 @@ int32_t main(int32_t argc, char **argv) {
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
     Slam slam(commandlineArguments,od4);
+    int gatheringTimeMs = (commandlineArguments.count("gatheringTimeMs")>0)?(std::stoi(commandlineArguments["gatheringTimeMs"])):(10);
+    Collector collector(slam,gatheringTimeMs,3);
     Drawer drawer(commandlineArguments,slam);
     Viewer viewer(commandlineArguments,drawer);
     std::thread viewThread (&Viewer::Run,viewer); 
@@ -82,10 +85,11 @@ int32_t main(int32_t argc, char **argv) {
       } 
     };
 
-    auto coneEnvelope{[&slammer = slam, senderStamp = detectconeStamp](cluon::data::Envelope &&envelope)
+    auto coneEnvelope{[&slammer = slam, senderStamp = detectconeStamp,&collector](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == senderStamp){
-          slammer.nextCone(envelope);
+          //slammer.nextCone(envelope);
+          collector.CollectCones(envelope);
         }
       }
     };

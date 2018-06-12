@@ -8,10 +8,10 @@ services:
         - .:/opt/opendlv.data
         command: "/opt/od4/bin/odsupercomponent --cid=${CID} --verbose=1 --configuration=/opt/opendlv.data/configuration"
 #    opendlv-logic-cfsd18-sensation-slam:
-#        image: "cfsdslam:latest"
+#        image: "slam:test"
 #        network_mode: "host"
 #        ipc: host
-#        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=112 --gatheringTimeMs=20 --sameConeThreshold=1.2 --refLatitude=57.70924648 --refLongitude=11.9462 --timeBetweenKeyframes=500 --coneMappingThreshold=50 --conesPerPacket=20"
+#        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=112 --gatheringTimeMs=20 --sameConeThreshold=1.2 --refLatitude=57.71395044 --refLongitude=11.94875904 --timeBetweenKeyframes=150 --coneMappingThreshold=20 --conesPerPacket=20"
     odcockpit:
         image: ${IMAGE}
         network_mode: host
@@ -33,13 +33,13 @@ services:
         ipc: host
         command: "cfsd18-sensation-attention --cid=${CID} --verbose --id=116 --xBoundary=4 --yBoundary=12 --groundLayerZ=-0.3 --coneHeight=0.5 --connectDistanceThreshold=0.4 --layerRangeThreshold=0.06 --minNumOfPointsForCone=2 --maxNumOfPointsForCone=80 --farConeRadiusThreshold=0.2 --nearConeRadiusThreshold=0.25 --zRangeThreshold=0.08 --inlierRangeThreshold=0.06 --dotThreshold=0.1 --inlierFoundThreshold=150 --numberOfIterations=10"
 
-    opendlv-logger:
-        image: "logger:test"
-        network_mode: "host"
-        ipc: host
-        volumes:
-        - ~/logs:/logs/
-        command: "opendlv-logger --cid=${CID} --wgs84path=/logs/wgs84.txt --geolocationpath=/logs/geoloc.txt --maxMessages=2000"
+#    opendlv-logger:
+#        image: "logger:test"
+#        network_mode: "host"
+#        ipc: host
+#        volumes:
+#        - ~/logs:/logs/
+#        command: "opendlv-logger --cid=${CID} --wgs84path=/logs/wgs84.txt --geolocationpath=/logs/geoloc.txt --maxMessages=2000"
 
 
     #proxy-velodyne16
