@@ -25,6 +25,9 @@ Cone::Cone(double x, double y,int type,int id):
 , m_type()
 , m_id()
 {
+  m_meanX = x;
+  m_meanY = y;
+
   m_x = x;
   m_y = y;
   m_type = type;
@@ -52,6 +55,13 @@ opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pos
   return msgDistance;
 }
 
+double Cone::getMeanX(){
+  return m_meanX;
+}
+
+double Cone::getMeanY(){
+  return m_meanY;
+}
 double Cone::getX(){
   return m_x;
 }
@@ -59,7 +69,6 @@ double Cone::getX(){
 double Cone::getY(){
   return m_y;
 }
-
 int Cone::getType(){
   return m_type;
 }
@@ -68,12 +77,12 @@ int Cone::getId(){
   return m_id;
 }
 
-void Cone::setX(double x){
-  m_x = x;
+void Cone::setMeanX(double x){
+  m_meanX = x;
 }
 
-void Cone::setY(double y){
-  m_y = y;
+void Cone::setMeanY(double y){
+  m_meanY = y;
 }
 
 void Cone::setType(int type){
@@ -94,7 +103,7 @@ uint32_t Cone::getObservations(){
   return m_observed.size();
 }
 
-Eigen::Vector2d Cone::getMean(){
+void Cone::calculateMean(){
   uint32_t observations = m_observed.size();
   double x = 0;
   double y = 0;
@@ -104,9 +113,6 @@ Eigen::Vector2d Cone::getMean(){
   }
   m_meanX = x/observations;
   m_meanY = y/observations;
-  Eigen::Vector2d meanVec;
-  meanVec << m_meanX, m_meanY;
-  return meanVec;
 }
 
 Eigen::Vector2d Cone::getCovariance(){

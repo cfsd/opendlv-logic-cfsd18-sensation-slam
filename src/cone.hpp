@@ -35,18 +35,20 @@ class Cone{
     opendlv::logic::perception::ObjectDistance getDistance(Eigen::Vector3d pose);
     
     
+    double getMeanX();
+    double getMeanY();
     double getX();
     double getY();
     int getType();
     int getId();
     
-    void setX(double x);
-    void setY(double y);
+    void setMeanX(double x);
+    void setMeanY(double y);
     void setType(int type);
     void setId(int id);
     void addObservation(Eigen::Vector3d observation);
     uint32_t getObservations();
-    Eigen::Vector2d getMean();
+    void calculateMean();
     Eigen::Vector2d getCovariance();
     void addConnectedPoseId(int i);
     std::vector<int> getConnectedPoses();

@@ -292,6 +292,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     m_poseId++;
 
     //Decide when to create graph
+    fullBA();
 }
 
 void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
@@ -395,8 +396,9 @@ void Slam::addOdometryMeasurement(Eigen::Vector3d pose, uint32_t i){
   }
 }
 
-void Slam::optimizeGraph(){
+void Slam::fullBA(){
 
+  createFullGraph();
 
   g2o::VertexSE2* firstRobotPose = dynamic_cast<g2o::VertexSE2*>(m_optimizer.vertex(1000));
   firstRobotPose->setFixed(true);
@@ -418,7 +420,20 @@ void Slam::optimizeGraph(){
   m_optimizer.optimize(10); //Add config for amount of iterations??
   std::cout << "Optimizing done." << std::endl;
 
+
+  Eigen::Vector2d updatedConeXY;
+  g2o::VertexPointXY* updatedConeVertex;
+
+  for(uint32_t j = 0; j < m_coneList.size(); j++){//Iterate and replace old map landmarks with new updated ones
+    updatedConeVertex = static_cast<g2o::VertexPointXY*>(m_optimizer.vertex(j));
+    updatedConeXY = updatedConeVertex->estimate();
+    m_coneList[j].setMeanX(updatedConeXY(0));
+    m_coneList[j].setMeanY(updatedConeXY(1));
+  }
+  updateMap(0,m_coneList.size());
+
 }
+
 
 Eigen::Vector3d Slam::coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   Eigen::Vector3d cone = Spherical2Cartesian(cones(0), cones(1), cones(2));
@@ -446,7 +461,10 @@ Eigen::Vector2d Slam::transformConeToCoG(double angle, double distance){
 void Slam::addConesToGraph(){
 
   for(uint32_t i = 0; i < m_coneList.size(); i++){
-    Eigen::Vector2d coneMeanXY = m_coneList[i].getMean();
+    m_coneList[i].calculateMean();
+    Eigen::Vector2d coneMeanXY;
+    coneMeanXY << m_coneList[i].getMeanX(),m_coneList[i].getMeanY();
+     
     g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
     coneVertex->setId(m_coneList[i].getId());
     coneVertex->setEstimate(coneMeanXY);
@@ -488,8 +506,9 @@ void Slam::addConeMeasurements(int i){
 
 Eigen::Vector2d Slam::getConeToPoseMeasurement(int i, int j){
   
+  m_coneList[i].calculateMean();
   Eigen::Vector2d cone;
-  cone = m_coneList[i].getMean();
+  cone << m_coneList[i].getMeanX(), m_coneList[i].getMeanY(); 
   Eigen::Vector2d pose;
   pose << m_poses[j](0), m_poses[j](1);
   Eigen::Vector2d measurement;
@@ -575,21 +594,16 @@ double Slam::distanceBetweenCones(Cone c1, Cone c2){
   return distance;
 }
 
-void Slam::updateMap(){
+void Slam::updateMap(uint32_t start, uint32_t end){
 
-  Eigen::Vector2d updatedConeXY;
-  g2o::VertexPointXY* updatedConeVertex;
+  //Eigen::Vector2d updatedConeXY;
+  //g2o::VertexPointXY* updatedConeVertex;
 
-  for(uint32_t j = 0; j < m_map.size(); j++){//Iterate and replace old map landmarks with new updated ones
-    updatedConeVertex = static_cast<g2o::VertexPointXY*>(m_optimizer.vertex(j));
-    updatedConeXY = updatedConeVertex->estimate();
-
-    std::cout << "old x: "<<m_map[j].getX() << " old y: " << m_map[j].getY() << std::endl;
-
-    m_map[j].setX(updatedConeXY(0));
-    m_map[j].setY(updatedConeXY(1));
-
-    std::cout << "optimized x: "<<m_map[j].getX() << " optimized y: " << m_map[j].getY() << std::endl;
+  for(uint32_t j = start; j < end; j++){//Iterate and replace old map landmarks with new updated ones
+    //updatedConeVertex = static_cast<g2o::VertexPointXY*>(m_optimizer.vertex(j));
+    //updatedConeXY = updatedConeVertex->estimate();
+    m_map[j].setMeanX(m_coneList[j].getMeanX());
+    m_map[j].setMeanY(m_coneList[j].getMeanY());
   }
 
 

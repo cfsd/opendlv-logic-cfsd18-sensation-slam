@@ -68,12 +68,12 @@ public:
   void tearDown();
   bool isKeyframe();
   void addOdometryMeasurement(Eigen::Vector3d pose,uint32_t i);
-  void optimizeGraph();
+  void fullBA();
   Eigen::Vector3d updatePoseFromGraph();
   void addPosesToGraph();
   void performSLAM(Eigen::MatrixXd Cones);
   void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
-  void createGraph();
+  void createFullGraph();
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
@@ -84,7 +84,7 @@ public:
   void initializeCollection();
   bool loopClosing(Cone cone,double distance2car);
   double distanceBetweenCones(Cone c1, Cone c2);
-  void updateMap();
+  void updateMap(uint32_t start, uint32_t end);
   void sendCones();
   void sendPose();
   void writeToPoseAndMapFile();
