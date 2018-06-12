@@ -103,6 +103,11 @@ uint32_t Cone::getObservations(){
   return m_observed.size();
 }
 
+Eigen::Vector2d Cone::getLocalConeObservation(int i){
+
+  return m_observed[i];
+}
+
 void Cone::calculateMean(){
   uint32_t observations = m_observed.size();
   double x = 0;

@@ -485,9 +485,9 @@ void Slam::addConeMeasurements(int i){
 
   for(uint32_t j = 0; j < connectedPoses.size(); j++){
   Eigen::Vector2d xyMeasurement;
-  xyMeasurement = getConeToPoseMeasurement(i,j);
+  xyMeasurement = getConeToPoseMeasurement(i,j,connectedPoses[j]);
 
-  coneMeasurement->vertices()[0] = m_optimizer.vertex(connectedPoses[j]+999);
+  coneMeasurement->vertices()[0] = m_optimizer.vertex(connectedPoses[j]);
   coneMeasurement->vertices()[1] = m_optimizer.vertex(m_coneList[i].getId());
   coneMeasurement->setMeasurement(xyMeasurement);
 
@@ -504,13 +504,12 @@ void Slam::addConeMeasurements(int i){
   //m_connectivityGraph[m_poseId-1001].push_back(cone.getId());
 }
 
-Eigen::Vector2d Slam::getConeToPoseMeasurement(int i, int j){
+Eigen::Vector2d Slam::getConeToPoseMeasurement(int i,int j, int connectedPose){
   
-  m_coneList[i].calculateMean();
   Eigen::Vector2d cone;
-  cone << m_coneList[i].getMeanX(), m_coneList[i].getMeanY(); 
+  cone = m_coneList[i].getLocalConeObservation(j); 
   Eigen::Vector2d pose;
-  pose << m_poses[j](0), m_poses[j](1);
+  pose << m_poses[connectedPose](0), m_poses[connectedPose](1);
   Eigen::Vector2d measurement;
   measurement << cone(0)-pose(0), cone(1)-pose(1);  
 

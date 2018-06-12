@@ -47,6 +47,7 @@ class Cone{
     void setType(int type);
     void setId(int id);
     void addObservation(Eigen::Vector3d observation);
+    Eigen::Vector2d getLocalConeObservation(int i);
     uint32_t getObservations();
     void calculateMean();
     Eigen::Vector2d getCovariance();

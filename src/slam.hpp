@@ -79,7 +79,7 @@ public:
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
   void addConeMeasurements(int i);
-  Eigen::Vector2d getConeToPoseMeasurement(int i, int j);
+  Eigen::Vector2d getConeToPoseMeasurement(int i, int j,int connectedPose);
   void addConesToGraph();
   void initializeCollection();
   bool loopClosing(Cone cone,double distance2car);
