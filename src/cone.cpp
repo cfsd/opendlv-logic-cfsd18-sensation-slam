@@ -83,3 +83,57 @@ void Cone::setType(int type){
 void Cone::setId(int id){
   m_id = id;
 }
+void Cone::addObservation(Eigen::Vector3d observation){
+  Eigen::Vector2d newObservation;
+  newObservation << observation(0),observation(1);
+  m_observed.push_back(newObservation);
+}
+
+uint32_t Cone::getObservations(){
+
+  return m_observed.size();
+}
+
+Eigen::Vector2d Cone::getMean(){
+  uint32_t observations = m_observed.size();
+  double x = 0;
+  double y = 0;
+  for(uint32_t i = 0; i < observations; i++){
+    x += m_observed[i](0);
+    y += m_observed[i](1);
+  }
+  m_meanX = x/observations;
+  m_meanY = y/observations;
+  Eigen::Vector2d meanVec;
+  meanVec << m_meanX, m_meanY;
+  return meanVec;
+}
+
+Eigen::Vector2d Cone::getCovariance(){
+
+  uint32_t observations = m_observed.size();
+  double varX = 0;
+  double varY = 0;
+
+  for(uint32_t i = 0; i < observations; i++){
+    varX += (m_observed[i](0) - m_meanX)*(m_observed[i](0) - m_meanX);
+    varY += (m_observed[i](1) - m_meanY)*(m_observed[i](1) - m_meanY);
+  }  
+  varX = varX/observations;
+  varY = varY/observations;
+  
+  Eigen::Vector2d covVec;
+  covVec << varX,varY;
+  return covVec; 
+}
+
+void Cone::addConnectedPoseId(int i){
+
+  m_connectedPoses.push_back(i);
+
+}
+
+std::vector<int> Cone::getConnectedPoses(){
+
+  return m_connectedPoses;
+}

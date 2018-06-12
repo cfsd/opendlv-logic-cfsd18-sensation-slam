@@ -51,7 +51,7 @@ private:
  typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 public:
   Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Session &a_od4);
-  ~Slam() = default;
+  ~Slam();
   void nextCone(cluon::data::Envelope data);
   void nextPose(cluon::data::Envelope data);
   void nextSplitPose(cluon::data::Envelope data);
@@ -66,29 +66,28 @@ public:
   void setUp(std::map<std::string, std::string> commandlineArguments);
   void setupOptimizer();
   void tearDown();
-  bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
   bool isKeyframe();
-  void addOdometryMeasurement(Eigen::Vector3d pose);
+  void addOdometryMeasurement(Eigen::Vector3d pose,uint32_t i);
   void optimizeGraph();
-  void localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones);
   Eigen::Vector3d updatePoseFromGraph();
-  Eigen::Vector3d updatePose(Eigen::Vector3d pose, Eigen::Vector2d errorDistance);
-  void addPoseToGraph(Eigen::Vector3d pose);
+  void addPosesToGraph();
   void performSLAM(Eigen::MatrixXd Cones);
-  Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
+  void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  void createGraph();
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
-  void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
-  void addConeMeasurement(Cone cone, Eigen::Vector3d measurement);
-  void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
+  void addConeMeasurements(int i);
+  Eigen::Vector2d getConeToPoseMeasurement(int i, int j);
+  void addConesToGraph();
   void initializeCollection();
   bool loopClosing(Cone cone,double distance2car);
   double distanceBetweenCones(Cone c1, Cone c2);
   void updateMap();
   void sendCones();
   void sendPose();
+  void writeToPoseAndMapFile();
   //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
@@ -128,6 +127,7 @@ public:
   float m_yawRate = 0.0f;
   cluon::data::TimeStamp m_yawReceivedTime = {};
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
+  std::vector<Cone> m_coneList = {};
   
 
     // Constants for degree transformation
