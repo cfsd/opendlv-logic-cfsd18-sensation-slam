@@ -60,6 +60,7 @@ public:
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
   std::vector<std::vector<int>> drawGraph();
+  void recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
   
 
  private:
