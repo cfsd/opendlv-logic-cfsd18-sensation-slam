@@ -68,7 +68,7 @@ int32_t main(int32_t argc, char **argv) {
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
     Slam slam(commandlineArguments,od4);
     int gatheringTimeMs = (commandlineArguments.count("gatheringTimeMs")>0)?(std::stoi(commandlineArguments["gatheringTimeMs"])):(10);
-    Collector collector(slam,gatheringTimeMs,3);
+    Collector collector(slam,gatheringTimeMs,2);
     Drawer drawer(commandlineArguments,slam);
     Viewer viewer(commandlineArguments,drawer);
     std::thread viewThread (&Viewer::Run,viewer); 

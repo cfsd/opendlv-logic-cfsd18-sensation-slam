@@ -274,6 +274,7 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
       coneIndex++;
       it++;
     }
+    std::cout << cones << std::endl;
     performSLAM(cones);
   }
 }

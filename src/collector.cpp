@@ -30,7 +30,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
     cluon::data::TimeStamp ts = data.sampleTimeStamp();
     int64_t delta = cluon::time::deltaInMicroseconds(ts,m_currentFrameTime);
     if(std::abs(delta)<1){
-        if(data.ID() == opendlv::logic::perception::ObjectDirection::ID()){
+        if(data.dataType() == opendlv::logic::perception::ObjectDirection::ID()){
             opendlv::logic::perception::ObjectDirection direction = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
             uint32_t id = direction.objectId();
             std::map<int,ConePackage>::iterator it;
@@ -47,7 +47,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
             }
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }
-        else if(data.ID() == opendlv::logic::perception::ObjectDistance::ID()){
+        else if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
             opendlv::logic::perception::ObjectDistance distance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
             uint32_t id = distance.objectId();
             std::map<int,ConePackage>::iterator it;
@@ -64,7 +64,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
             }
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }
-        else if(data.ID() == opendlv::logic::perception::ObjectType::ID()){
+        else if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
             opendlv::logic::perception::ObjectType type = cluon::extractMessage<opendlv::logic::perception::ObjectType>(std::move(data));
             uint32_t id = type.objectId();
             std::map<int,ConePackage>::iterator it;
@@ -92,31 +92,31 @@ void Collector::CollectCones(cluon::data::Envelope data){
         m_messageCount = 1;
         m_currentFrameTime = data.sampleTimeStamp();
         m_newFrame = false;
-        if(data.ID() == opendlv::logic::perception::ObjectDirection::ID()){
+        if(data.dataType() == opendlv::logic::perception::ObjectDirection::ID()){
             opendlv::logic::perception::ObjectDirection direction = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
             uint32_t id = direction.objectId();
             ConePackage conePacket;
             std::get<0>(conePacket) = direction;
             m_currentFrame[id] = conePacket;
-            m_envelopeCount[id]++;
+            m_envelopeCount[id]=1;
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }
-        else if(data.ID() == opendlv::logic::perception::ObjectDistance::ID()){
+        else if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
             opendlv::logic::perception::ObjectDistance distance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
             uint32_t id = distance.objectId();
             ConePackage conePacket;
             std::get<1>(conePacket) = distance;
             m_currentFrame[id] = conePacket;
-            m_envelopeCount[id]++;
+            m_envelopeCount[id]=1;
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }
-        else if(data.ID() == opendlv::logic::perception::ObjectType::ID()){
+        else if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
             opendlv::logic::perception::ObjectType type = cluon::extractMessage<opendlv::logic::perception::ObjectType>(std::move(data));
             uint32_t id = type.objectId();
             ConePackage conePacket;
             std::get<2>(conePacket) = type;
             m_currentFrame[id] = conePacket;
-            m_envelopeCount[id]++;
+            m_envelopeCount[id]=1;
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }        
         std::thread coneCollector (&Collector::InitializeCollection,this); //just sleep instead maybe since this is unclear how it works
@@ -145,8 +145,8 @@ auto start = std::chrono::system_clock::now();
     }
   }
   GetCompleteFrame();
-  m_newFrame = true;
   SendFrame();
+  m_newFrame = true;
 }
 
 void Collector::GetCompleteFrame(){
@@ -156,6 +156,7 @@ void Collector::GetCompleteFrame(){
             m_currentFrame.erase(it2->first);
             std::cout << "Incomplete frame with id " << it2->first << " removed" << std::endl;
         }
+        it2++;
     }
 }
 
