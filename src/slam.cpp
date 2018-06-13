@@ -355,6 +355,107 @@ void Slam::createFullGraph(){
 
 }
 
+void Slam::createEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd){
+
+  //Initialize graph
+  g2o::SparseOptimizer essentialGraph;
+  typedef g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1> > slamBlockSolver;
+  typedef g2o::LinearSolverEigen<slamBlockSolver::PoseMatrixType> slamLinearSolver;
+  
+  auto linearSolver = g2o::make_unique<slamLinearSolver>();
+  linearSolver->setBlockOrdering(false);
+  
+  g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
+  essentialGraph.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
+  essentialGraph.setVerbose(true);
+
+  std::vector<int> posesToGraph;
+  //Find cones of conespan and extract poses
+  for(uint32_t i = graphIndexStart; i < graphIndexEnd; i++){
+
+    std::vector<int> currentConnectedPoses = m_coneList[i].getConnectedPoses();
+
+    for(uint32_t j = 0; j < currentConnectedPoses.size(); j++){
+
+      posesToGraph.push_back(currentConnectedPoses[j]);
+    }
+
+  }
+  if(posesToGraph.size() > 0){
+
+    uint32_t max = *std::max_element(posesToGraph.begin(), posesToGraph.end());
+    uint32_t min = *std::min_element(posesToGraph.begin(), posesToGraph.end());
+    std::cout << "start Essentail: " << min << " | end essentail: " << max << std::endl;
+
+    //add poses to graph based on min and max
+    for(uint32_t k = min; k < max; k++){
+
+      //Add vertex
+      g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
+      poseVertex->setId(k+1000);
+      poseVertex->setEstimate(m_poses[k]);
+
+      essentialGraph.addVertex(poseVertex);
+
+      //Add edge
+      if(k > min){
+        g2o::EdgeSE2* odometryEdge = new g2o::EdgeSE2;
+        odometryEdge->vertices()[0] = essentialGraph.vertex(k+999);
+        odometryEdge->vertices()[1] = essentialGraph.vertex(k+1000);
+        g2o::VertexSE2* prevVertex = static_cast<g2o::VertexSE2*>(essentialGraph.vertex(k+999));
+        g2o::SE2 prevPose = prevVertex->estimate();
+        g2o::SE2 currentPose = g2o::SE2(m_poses[k](0), m_poses[k](1), m_poses[k](2));
+        g2o::SE2 measurement = prevPose.inverse()*currentPose;
+        odometryEdge->setMeasurement(measurement);
+        odometryEdge->setInformation(Eigen::Matrix3d::Identity()*5); //Actual covariance should be configured
+        essentialGraph.addEdge(odometryEdge);
+      }
+    }
+
+  }  
+  
+  //Connect cones to poses
+  for(uint32_t i = graphIndexStart; i < graphIndexEnd; i++){
+      m_coneList[i].calculateMean();
+      Eigen::Vector2d coneMeanXY;
+      coneMeanXY << m_coneList[i].getMeanX(),m_coneList[i].getMeanY();
+     
+      g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
+      coneVertex->setId(m_coneList[i].getId());
+      coneVertex->setEstimate(coneMeanXY);
+      essentialGraph.addVertex(coneVertex);
+
+      //Connect cones to POses
+      g2o::EdgeSE2PointXY* coneMeasurement = new g2o::EdgeSE2PointXY;
+      std::vector<int> connectedPoses = m_coneList[i].getConnectedPoses();
+
+    for(uint32_t j = 0; j < connectedPoses.size(); j++){
+        Eigen::Vector2d xyMeasurement;
+        xyMeasurement = getConeToPoseMeasurement(i,j,connectedPoses[j]);
+
+        coneMeasurement->vertices()[0] = essentialGraph.vertex(connectedPoses[j]);
+        coneMeasurement->vertices()[1] = essentialGraph.vertex(m_coneList[i].getId());
+        coneMeasurement->setMeasurement(xyMeasurement);
+
+        Eigen::Vector2d covXY = m_coneList[i].getCovariance();
+        Eigen::Matrix2d informationMatrix;
+        informationMatrix << covXY(0),0,
+                            0,covXY(1);
+        coneMeasurement->setInformation(informationMatrix); //Placeholder value
+
+        essentialGraph.addEdge(coneMeasurement);
+
+      }
+    }
+
+
+  std::cout << "Optimizing" << std::endl;
+  essentialGraph.initializeOptimization();
+  essentialGraph.optimize(10); //Add config for amount of iterations??
+  std::cout << "Optimizing done." << std::endl;
+
+}
+
 Eigen::Vector3d Slam::updatePoseFromGraph(){
 
   g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(m_poseId-1));

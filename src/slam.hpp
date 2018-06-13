@@ -74,6 +74,7 @@ public:
   void performSLAM(Eigen::MatrixXd Cones);
   void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void createFullGraph();
+  void createEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
