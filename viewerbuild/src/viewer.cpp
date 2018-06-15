@@ -24,6 +24,7 @@ void Viewer::Run(){
     pangolin::CreatePanel("menu").SetBounds(0.0,1.0,0.0,pangolin::Attach::Pix(175));
     pangolin::Var<bool> menuShowCones("menu.ShowCones",true,true);
     pangolin::Var<bool> menuShowPoses("menu.ShowPoses",true,true);
+    pangolin::Var<bool> menuShowEssentialCones("menu.ShowEssentialCones",true,true);
     pangolin::Var<bool> menuShowCurrentPose("menu.ShowCurrentPose",true,true);
     pangolin::Var<bool> menuShowGraph("menu.ShowGraph",true,true);
     pangolin::Var<bool> menuExit("menu.Exit",false,false);
@@ -47,6 +48,8 @@ void Viewer::Run(){
         //m_drawer.drawCurrentCar(Twc);
         if(menuShowCones)
             m_drawer.drawCones();
+        if(menuShowEssentialCones)
+            m_drawer.drawEssentialCones();    
         if(menuShowPoses)
             m_drawer.drawPoses();
         if(menuShowCurrentPose)

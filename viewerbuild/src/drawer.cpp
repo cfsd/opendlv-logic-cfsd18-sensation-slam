@@ -16,8 +16,8 @@ void Drawer::drawCones(){
     }    
     glBegin(GL_POINTS);
     for(uint32_t i = 0; i<nPoints; i++){
-        float x = static_cast<float>(m_cones[i].getMeanX()/5);
-        float y = static_cast<float>(m_cones[i].getMeanY()/5);
+        float x = static_cast<float>(m_cones[i].getOptX()/5);
+        float y = static_cast<float>(m_cones[i].getOptY()/5);
         float z = 0.0f;
         if(m_cones[i].getType() == 1){
             glColor3f(1.0,1.0,0.0);//yellow
@@ -40,10 +40,60 @@ void Drawer::drawCones(){
             glPointSize(10);
         }
         glVertex3f(x,y,z);
+        x = static_cast<float>(m_cones[i].getMeanX()/5);
+        y = static_cast<float>(m_cones[i].getMeanY()/5);
+        z = 0.0f;
+        glColor3f(1.0f,0.0f,1.0f);
+        glPointSize(10);
+        glVertex3f(x,y,z);
     }
+
     glEnd();
 }
+void Drawer::drawEssentialCones(){
 
+        m_cones = slam.drawLocalOptimizedCones();
+    uint32_t nPoints = static_cast<unsigned int>(m_cones.size());
+    if(nPoints == 0){
+        return;
+    }    
+    glBegin(GL_POINTS);
+    for(uint32_t i = 0; i<nPoints; i++){
+        float x = static_cast<float>(m_cones[i].getOptX()/5);
+        float y = static_cast<float>(m_cones[i].getOptY()/5);
+        float z = 0.0f;
+        if(m_cones[i].getType() == 1){
+            glColor3f(1.0,1.0,0.0);//yellow
+            glPointSize(10);
+        }
+        else if(m_cones[i].getType() == 2){
+            glColor3f(0.0,0.0,1.0);//blue
+            glPointSize(10);    
+        }
+        else if(m_cones[i].getType() == 3){
+            glColor3f(1.0,0.5,0.0);//little orange
+            glPointSize(10);
+        }
+        else if(m_cones[i].getType() == 4){
+            glColor3f(1.0,0.5,0.0);//big orange
+            glPointSize(15);
+        }
+        else{
+            glColor3f(0.5f,1.0f,0.0f);
+            glPointSize(10);
+        }
+        glVertex3f(x,y,z);
+         x = static_cast<float>(m_cones[i].getMeanX()/5);
+         y = static_cast<float>(m_cones[i].getMeanY()/5);
+         z = 0.0f;
+         glColor3f(0.0f,1.0f,1.0f);
+            glPointSize(10);
+            glVertex3f(x,y,z);
+    }
+
+    glEnd();
+
+}
 void Drawer::drawPoses(){
     m_poses = slam.drawPoses();
     uint32_t nPoints = static_cast<unsigned int>(m_poses.size());

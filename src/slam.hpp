@@ -57,6 +57,7 @@ public:
   void nextSplitPose(cluon::data::Envelope data);
   void nextYawRate(cluon::data::Envelope data);
   std::vector<Cone> drawCones();
+  std::vector<Cone> drawLocalOptimizedCones();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
   std::vector<std::vector<int>> drawGraph();
@@ -87,7 +88,7 @@ public:
   void initializeCollection();
   bool loopClosing(Cone cone,double distance2car);
   double distanceBetweenCones(Cone c1, Cone c2);
-  void updateMap(uint32_t start, uint32_t end);
+  void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
   void sendCones();
   void sendPose();
   void writeToPoseAndMapFile();
@@ -110,6 +111,7 @@ public:
   Eigen::Vector3d m_odometryData;
   std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
+  std::vector<Cone> m_essentialMap = {};
   std::vector<Eigen::Vector3d> m_poses = {};
   std::vector<std::vector<int>> m_connectivityGraph = {};
   double m_newConeThreshold= 1;

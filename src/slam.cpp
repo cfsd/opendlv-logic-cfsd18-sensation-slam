@@ -292,20 +292,21 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       createConnections(cones,pose);
     }
-    uint32_t coneDiff = m_coneList.size() - m_coneRef;
+    uint32_t currentEndCone = m_coneList.size() - 1; 
+    uint32_t coneDiff = currentEndCone - m_coneRef;
     std::cout << "coneD: " << coneDiff << std::endl; 
-    if(coneDiff > 10){
+    if(coneDiff >= 6){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
-      optimizeEssentialGraph(m_coneList.size()-coneDiff,m_coneList.size());
+      optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
 
-       m_coneRef = m_coneList.size(); 
+       m_coneRef = currentEndCone; 
     }
 
     m_poseId++;
     //Decide when to create essential graphs
 
     //Decide when to create graph
-    if(m_poseId > 1150 && m_poseId < 1152){
+    if(m_poseId > 1180 && m_poseId < 1182){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       fullBA();
     }
@@ -394,7 +395,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
 
   std::vector<int> posesToGraph;
   //Find cones of conespan and extract poses
-  for(uint32_t i = graphIndexStart; i < graphIndexEnd; i++){
+  for(uint32_t i = graphIndexStart; i < graphIndexEnd+1; i++){
 
     std::vector<int> currentConnectedPoses = m_coneList[i].getConnectedPoses();
 
@@ -416,7 +417,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
       //Add vertex
       g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
       poseVertex->setId(k);
-      poseVertex->setEstimate(m_poses[k]);
+      poseVertex->setEstimate(m_poses[k-1000]);
 
       essentialGraph.addVertex(poseVertex);
 
@@ -430,7 +431,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
         g2o::SE2 currentPose = g2o::SE2(m_poses[k-1000](0), m_poses[k-1000](1), m_poses[k-1000](2));
         g2o::SE2 measurement = prevPose.inverse()*currentPose;
         odometryEdge->setMeasurement(measurement);
-        odometryEdge->setInformation(Eigen::Matrix3d::Identity()*1); //Actual covariance should be configured
+        odometryEdge->setInformation(Eigen::Matrix3d::Identity()*1/0.5); //Actual covariance should be configured
         essentialGraph.addEdge(odometryEdge);
       }
     }
@@ -438,11 +439,14 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
     //Connect cones to poses
     for(uint32_t i = graphIndexStart; i < graphIndexEnd; i++){
 
+        Eigen::Vector2d coneMeanXY;
         if(!m_coneList[i].isOptimized()){
           m_coneList[i].calculateMean();
+          coneMeanXY << m_coneList[i].getMeanX(),m_coneList[i].getMeanY();
+        }else{
+          coneMeanXY << m_coneList[i].getOptX(),m_coneList[i].getOptY();
+
         }
-        Eigen::Vector2d coneMeanXY;
-        coneMeanXY << m_coneList[i].getMeanX(),m_coneList[i].getMeanY();
       
         g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
         coneVertex->setId(m_coneList[i].getId());
@@ -484,6 +488,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
     std::cout << "Optimizing done." << std::endl;
 
     updateFromEssential(min, max, graphIndexStart,graphIndexEnd, essentialGraph);
+    updateMap(graphIndexStart,graphIndexEnd,false);
   }
 }
 
@@ -505,8 +510,8 @@ void Slam::updateFromEssential(uint32_t poseStart, uint32_t poseEnd,uint32_t con
    for(uint32_t i = coneStart; i < coneEnd; i++){
     updatedConeVertex = static_cast<g2o::VertexPointXY*>(essentialGraph.vertex(i));
     updatedConeXY = updatedConeVertex->estimate();
-    m_coneList[i].setMeanX(updatedConeXY(0));
-    m_coneList[i].setMeanY(updatedConeXY(1));
+    m_coneList[i].setOptX(updatedConeXY(0));
+    m_coneList[i].setOptY(updatedConeXY(1));
     m_coneList[i].setOptimized();    
    }
 }
@@ -547,7 +552,7 @@ void Slam::addOdometryMeasurement(Eigen::Vector3d pose, uint32_t i){
     g2o::SE2 currentPose = g2o::SE2(pose(0), pose(1), pose(2));
     g2o::SE2 measurement = prevPose.inverse()*currentPose;
     odometryEdge->setMeasurement(measurement);
-    odometryEdge->setInformation(Eigen::Matrix3d::Identity()*5); //Actual covariance should be configured
+    odometryEdge->setInformation(Eigen::Matrix3d::Identity()*1/0.5); //Actual covariance should be configured
     m_optimizer.addEdge(odometryEdge);
   }
 }
@@ -586,7 +591,13 @@ void Slam::fullBA(){
     m_coneList[j].setMeanX(updatedConeXY(0));
     m_coneList[j].setMeanY(updatedConeXY(1));
   }
-  updateMap(0,m_coneList.size());
+    for(uint32_t i = 0; i < m_poses.size(); i++){
+    g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(i+1000));
+    g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
+    Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
+    m_poses[i] << updatedPose(0),updatedPose(1),updatedPose(2);
+  }
+  updateMap(0,m_coneList.size(),true);
 
 }
 
@@ -618,12 +629,13 @@ void Slam::addConesToGraph(){
 
   for(uint32_t i = 0; i < m_coneList.size(); i++){
     
+    Eigen::Vector2d coneMeanXY;
     if(!m_coneList[i].isOptimized()){
       m_coneList[i].calculateMean();
+      coneMeanXY << m_coneList[i].getMeanX(),m_coneList[i].getMeanY();
+    }else{
+      coneMeanXY << m_coneList[i].getOptX(),m_coneList[i].getOptY();
     }
-    
-    Eigen::Vector2d coneMeanXY;
-    coneMeanXY << m_coneList[i].getMeanX(),m_coneList[i].getMeanY();
      
     g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
     coneVertex->setId(m_coneList[i].getId());
@@ -653,8 +665,8 @@ void Slam::addConeMeasurements(int i){
 
   Eigen::Vector2d covXY = m_coneList[i].getCovariance();
   Eigen::Matrix2d informationMatrix;
-  informationMatrix << covXY(0),0,
-                       0,covXY(1);
+  informationMatrix << 1/covXY(0),0,
+                       0,1/covXY(1);
   coneMeasurement->setInformation(informationMatrix); //Placeholder value
 
   m_optimizer.addEdge(coneMeasurement);
@@ -754,14 +766,21 @@ bool Slam::loopClosing(Cone cone,double distance2car){
 }
 
 double Slam::distanceBetweenCones(Cone c1, Cone c2){
-  double distance = std::sqrt( (c1.getX()-c2.getX())*(c1.getX()-c2.getX()) + (c1.getY()-c2.getY())*(c1.getY()-c2.getY()) );
+  c1.calculateMean();
+  double distance = std::sqrt( (c1.getMeanX()-c2.getMeanX())*(c1.getMeanX()-c2.getMeanX()) + (c1.getMeanY()-c2.getMeanY())*(c1.getMeanY()-c2.getMeanY()) );
   return distance;
 }
 
-void Slam::updateMap(uint32_t start, uint32_t end){
+void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
 
   for(uint32_t i = start; i < end; i++){
-    m_map.push_back(m_coneList[i]);
+
+    if(updateToGlobal){
+      m_map.push_back(m_coneList[i]);
+    }else{
+
+      m_essentialMap.push_back(m_coneList[i]);
+    }
   }
   
 
@@ -802,7 +821,10 @@ std::vector<Cone> Slam::drawCones(){
   std::lock_guard<std::mutex> lock(m_mapMutex);
   return m_map;
 }
-
+std::vector<Cone> Slam::drawLocalOptimizedCones(){
+  std::lock_guard<std::mutex> lock(m_mapMutex);
+  return m_essentialMap;
+}
 Eigen::Vector3d Slam::drawCurrentPose(){
   if(m_loopClosingComplete){
     std::lock_guard<std::mutex> lock(m_sendMutex);

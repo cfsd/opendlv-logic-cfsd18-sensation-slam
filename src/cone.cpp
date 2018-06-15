@@ -54,6 +54,20 @@ opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pos
   msgDistance.distance(static_cast<float>(distance));
   return msgDistance;
 }
+double Cone::getOptX(){
+
+  return m_optX;
+}
+double Cone::getOptY(){
+
+  return m_optY;
+}
+void Cone::setOptX(double x){
+  m_optX = x;
+}
+void Cone::setOptY(double y){
+  m_optY = y;
+}
 double Cone::getMeanX(){
   return m_meanX;
 }
@@ -121,12 +135,14 @@ void Cone::calculateMean(){
   uint32_t observations = m_observed.size();
   double x = 0;
   double y = 0;
-  for(uint32_t i = 0; i < observations; i++){
-    x += m_observed[i](0);
-    y += m_observed[i](1);
+  if(observations > 1){
+    for(uint32_t i = 0; i < observations; i++){
+      x += m_observed[i](0);
+      y += m_observed[i](1);
+    }
+    m_meanX = x/observations;
+    m_meanY = y/observations;
   }
-  m_meanX = x/observations;
-  m_meanY = y/observations;
 }
 
 Eigen::Vector2d Cone::getCovariance(){
