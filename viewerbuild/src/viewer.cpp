@@ -22,7 +22,8 @@ void Viewer::Run(){
     glEnable (GL_BLEND);
     glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     pangolin::CreatePanel("menu").SetBounds(0.0,1.0,0.0,pangolin::Attach::Pix(175));
-    pangolin::Var<bool> menuShowCones("menu.ShowCones",true,true);
+    pangolin::Var<bool> menuShowRawCones("menu.ShowRawCones",true,true);
+    pangolin::Var<bool> menuShowOptimizedCones("menu.ShowOptimizedCones",true,true);
     pangolin::Var<bool> menuShowPoses("menu.ShowPoses",true,true);
     pangolin::Var<bool> menuShowEssentialCones("menu.ShowEssentialCones",true,true);
     pangolin::Var<bool> menuShowCurrentPose("menu.ShowCurrentPose",true,true);
@@ -46,8 +47,10 @@ void Viewer::Run(){
         d_cam.Activate(s_cam);
         glClearColor(1.0f,1.0f,1.0f,1.0f);
         //m_drawer.drawCurrentCar(Twc);
-        if(menuShowCones)
-            m_drawer.drawCones();
+        if(menuShowRawCones)
+            m_drawer.drawRawCones();
+        if(menuShowOptimizedCones)
+            m_drawer.drawOptimizedCones();
         if(menuShowEssentialCones)
             m_drawer.drawEssentialCones();    
         if(menuShowPoses)

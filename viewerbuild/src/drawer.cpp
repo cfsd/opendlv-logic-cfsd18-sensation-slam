@@ -8,7 +8,43 @@ slam(a_slam)
 }
 
 
-void Drawer::drawCones(){
+void Drawer::drawRawCones(){
+    m_cones = slam.drawCones();
+    uint32_t nPoints = static_cast<unsigned int>(m_cones.size());
+    if(nPoints == 0){
+        return;
+    }    
+    glBegin(GL_POINTS);
+    for(uint32_t i = 0; i<nPoints; i++){
+        float x = static_cast<float>(m_cones[i].getX()/5);
+        float y = static_cast<float>(m_cones[i].getY()/5);
+        float z = 0.0f;
+        if(m_cones[i].getType() == 1){
+            glColor3f(1.0,1.0,0.0);//yellow
+            glPointSize(10);
+        }
+        else if(m_cones[i].getType() == 2){
+            glColor3f(0.0,0.0,1.0);//blue
+            glPointSize(10);    
+        }
+        else if(m_cones[i].getType() == 3){
+            glColor3f(1.0,0.5,0.0);//little orange
+            glPointSize(10);
+        }
+        else if(m_cones[i].getType() == 4){
+            glColor3f(1.0,0.5,0.0);//big orange
+            glPointSize(15);
+        }
+        else{
+            glColor3f(0.5,0.5,0.5);
+            glPointSize(10);
+        }
+        glVertex3f(x,y,z);
+    }
+
+    glEnd();
+}
+void Drawer::drawOptimizedCones(){
     m_cones = slam.drawCones();
     uint32_t nPoints = static_cast<unsigned int>(m_cones.size());
     if(nPoints == 0){
@@ -36,15 +72,9 @@ void Drawer::drawCones(){
             glPointSize(15);
         }
         else{
-            glColor3f(0.5,0.5,0.5);
+            glColor3f(1.0f,0.0f,1.0f);
             glPointSize(10);
         }
-        glVertex3f(x,y,z);
-        x = static_cast<float>(m_cones[i].getMeanX()/5);
-        y = static_cast<float>(m_cones[i].getMeanY()/5);
-        z = 0.0f;
-        glColor3f(1.0f,0.0f,1.0f);
-        glPointSize(10);
         glVertex3f(x,y,z);
     }
 
@@ -83,12 +113,6 @@ void Drawer::drawEssentialCones(){
             glPointSize(10);
         }
         glVertex3f(x,y,z);
-         x = static_cast<float>(m_cones[i].getMeanX()/5);
-         y = static_cast<float>(m_cones[i].getMeanY()/5);
-         z = 0.0f;
-         glColor3f(0.0f,1.0f,1.0f);
-            glPointSize(10);
-            glVertex3f(x,y,z);
     }
 
     glEnd();

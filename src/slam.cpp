@@ -297,7 +297,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     std::cout << "coneD: " << coneDiff << std::endl; 
     if(coneDiff >= 10){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
-      optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
+      //optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
 
        m_coneRef = currentEndCone; 
     }
@@ -361,7 +361,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       }
       j++;
     }
-    if(distanceToCar < m_coneMappingThreshold && !coneFound && !m_loopClosing){
+    if(distanceToCar < m_coneMappingThreshold && !coneFound && !m_loopClosing && !firstCone){
       std::cout << "Trying to add cone" << std::endl;
       Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
       cone.addObservation(localCone, globalCone,m_poseId,m_currentConeIndex);
@@ -595,7 +595,8 @@ void Slam::fullBA(){
     m_coneList[j].setOptX(updatedConeXY(0));
     m_coneList[j].setOptY(updatedConeXY(1));
   }
-    for(uint32_t i = 0; i < m_poses.size(); i++){
+  
+  for(uint32_t i = 0; i < m_poses.size(); i++){
     g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(i+1000));
     g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
     Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
@@ -771,6 +772,7 @@ bool Slam::loopClosing(Cone cone,double distance2car){
 
 double Slam::distanceBetweenCones(Cone c1, Cone c2){
   c1.calculateMean();
+  c2.calculateMean();
   double distance = std::sqrt( (c1.getMeanX()-c2.getMeanX())*(c1.getMeanX()-c2.getMeanX()) + (c1.getMeanY()-c2.getMeanY())*(c1.getMeanY()-c2.getMeanY()) );
   return distance;
 }
