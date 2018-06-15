@@ -48,19 +48,17 @@ class Cone{
     void setMeanY(double y);
     void setType(int type);
     void setId(int id);
-    void addObservation(Eigen::Vector3d observation);
-    void addLocalObservation(Eigen::Vector3d observation);
+    void addObservation(Eigen::Vector3d localObservation,Eigen::Vector3d globalObservation,int i,int currConeId);
     Eigen::Vector2d getLocalConeObservation(int i);
     Eigen::Vector2d getGlobalConeObservation(int i);
     uint32_t getObservations();
     
     void calculateMean();
     Eigen::Vector2d getCovariance();
-    void addConnectedPoseId(int i);
     std::vector<int> getConnectedPoses();
     void setOptimized();
     bool isOptimized();
-
+    bool getLoopClosingState();
 
   private:
     double m_x;
@@ -74,6 +72,7 @@ class Cone{
     double m_meanY = 0;
     std::vector<int> m_connectedPoses = {};
     bool m_optimizedState = false;
+    bool m_looperCandidate = false;
     double m_optX = 0;
     double m_optY = 0;
 };

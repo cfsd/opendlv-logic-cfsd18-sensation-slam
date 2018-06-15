@@ -105,16 +105,26 @@ void Cone::setType(int type){
 void Cone::setId(int id){
   m_id = id;
 }
-void Cone::addObservation(Eigen::Vector3d observation){
-  Eigen::Vector2d newObservation;
-  newObservation << observation(0),observation(1);
-  m_observed.push_back(newObservation);
-}
-void Cone::addLocalObservation(Eigen::Vector3d observation){
-  Eigen::Vector2d newObservation;
-  newObservation << observation(0),observation(1);
-  m_localObserved.push_back(newObservation);
+void Cone::addObservation(Eigen::Vector3d localObservation,Eigen::Vector3d globalObservation,int i,int currConeId){
 
+  Eigen::Vector2d newLocalObservation;
+  newLocalObservation << localObservation(0),localObservation(1);
+  m_localObserved.push_back(newLocalObservation);
+
+  Eigen::Vector2d newGlobalObservation;
+  newGlobalObservation << globalObservation(0),globalObservation(1);
+  m_observed.push_back(newGlobalObservation);
+
+  m_connectedPoses.push_back(i);
+  if(!m_looperCandidate && currConeId > 20){
+    uint32_t max = *std::max_element(m_connectedPoses.begin(), m_connectedPoses.end());
+    uint32_t min = *std::min_element(m_connectedPoses.begin(), m_connectedPoses.end());
+
+    if(max-min > 50 ){
+      m_looperCandidate = true;
+    }
+  }
+  //Check looperCandidate
 }
 
 uint32_t Cone::getObservations(){
@@ -170,12 +180,6 @@ Eigen::Vector2d Cone::getCovariance(){
   }
 }
 
-void Cone::addConnectedPoseId(int i){
-
-  m_connectedPoses.push_back(i);
-
-}
-
 std::vector<int> Cone::getConnectedPoses(){
 
   return m_connectedPoses;
@@ -188,4 +192,7 @@ void Cone::setOptimized(){
 bool Cone::isOptimized(){
 
   return m_optimizedState;
+}
+bool Cone::getLoopClosingState(){
+  return m_looperCandidate;
 }

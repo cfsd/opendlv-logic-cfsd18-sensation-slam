@@ -295,7 +295,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     uint32_t currentEndCone = m_coneList.size() - 1; 
     uint32_t coneDiff = currentEndCone - m_coneRef;
     std::cout << "coneD: " << coneDiff << std::endl; 
-    if(coneDiff >= 6){
+    if(coneDiff >= 10){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
 
@@ -306,9 +306,19 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     //Decide when to create essential graphs
 
     //Decide when to create graph
-    if(m_poseId > 1180 && m_poseId < 1182){
-      std::lock_guard<std::mutex> lockMap(m_mapMutex);
-      fullBA();
+    if(!m_loopClosingComplete){
+      int loopClosers = 0;
+        std::lock_guard<std::mutex> lockMap(m_mapMutex);
+      for(uint32_t m = 0; m < m_coneList.size(); m++){
+        if(m_coneList[m].getLoopClosingState()){
+          loopClosers++;
+        }
+      }
+
+      if(loopClosers > 1){
+        fullBA();
+        m_loopClosingComplete = true;
+      }
     }
 }
 
@@ -320,9 +330,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,0), cones(1,0),cones(2,0));
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(0));
     Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
-    cone.addLocalObservation(localCone);
-    cone.addObservation(globalCone);
-    cone.addConnectedPoseId(m_poseId);
+    cone.addObservation(localCone,globalCone,m_poseId,m_currentConeIndex);
 
     m_coneList.push_back(cone);
     firstCone = true;
@@ -343,10 +351,8 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
         if(distance<m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
           coneFound = true;
-          m_coneList[j].addLocalObservation(localCone);
-          m_coneList[j].addObservation(globalCone);
-          m_coneList[j].addConnectedPoseId(m_poseId);
-
+          m_coneList[j].addObservation(localCone, globalCone, m_poseId,m_currentConeIndex);
+          
           if(distanceToCar<minDistance){//Update current cone to know where in the map we are
             m_currentConeIndex = j;
             minDistance = distanceToCar;
@@ -358,9 +364,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     if(distanceToCar < m_coneMappingThreshold && !coneFound && !m_loopClosing){
       std::cout << "Trying to add cone" << std::endl;
       Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
-      cone.addLocalObservation(localCone);
-      cone.addObservation(globalCone);  
-      cone.addConnectedPoseId(m_poseId);
+      cone.addObservation(localCone, globalCone,m_poseId,m_currentConeIndex);
       m_coneList.push_back(cone);
     }
   }
@@ -588,8 +592,8 @@ void Slam::fullBA(){
   for(uint32_t j = 0; j < m_coneList.size(); j++){//Iterate and replace old map landmarks with new updated ones
     updatedConeVertex = static_cast<g2o::VertexPointXY*>(m_optimizer.vertex(j));
     updatedConeXY = updatedConeVertex->estimate();
-    m_coneList[j].setMeanX(updatedConeXY(0));
-    m_coneList[j].setMeanY(updatedConeXY(1));
+    m_coneList[j].setOptX(updatedConeXY(0));
+    m_coneList[j].setOptY(updatedConeXY(1));
   }
     for(uint32_t i = 0; i < m_poses.size(); i++){
     g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(m_optimizer.vertex(i+1000));
