@@ -46,8 +46,11 @@ class Cone{
     void setType(int type);
     void setId(int id);
     void addObservation(Eigen::Vector3d observation);
+    void addLocalObservation(Eigen::Vector3d observation);
     Eigen::Vector2d getLocalConeObservation(int i);
+    Eigen::Vector2d getGlobalConeObservation(int i);
     uint32_t getObservations();
+    
     void calculateMean();
     Eigen::Vector2d getCovariance();
     void addConnectedPoseId(int i);
@@ -63,6 +66,7 @@ class Cone{
     int m_id;
     const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;
     std::vector<Eigen::Vector2d> m_observed = {};
+    std::vector<Eigen::Vector2d> m_localObserved = {};
     double m_meanX = 0;
     double m_meanY = 0;
     std::vector<int> m_connectedPoses = {};

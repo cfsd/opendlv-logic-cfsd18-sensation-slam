@@ -81,7 +81,7 @@ public:
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
   void addConeMeasurements(int i);
-  Eigen::Vector2d getConeToPoseMeasurement(int i, int j,int connectedPose);
+  Eigen::Vector2d getConeToPoseMeasurement(int i, int j);
   Eigen::Vector2d getLocalConeToPoseMeasurement(Eigen::Vector3d pose, Eigen::Vector2d cone);
   void addConesToGraph();
   void initializeCollection();

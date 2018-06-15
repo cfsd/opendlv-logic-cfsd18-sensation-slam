@@ -294,7 +294,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     }
     uint32_t coneDiff = m_coneList.size() - m_coneRef;
     std::cout << "coneD: " << coneDiff << std::endl; 
-    if(coneDiff > 20){
+    if(coneDiff > 10){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       optimizeEssentialGraph(m_coneList.size()-coneDiff,m_coneList.size());
 
@@ -316,9 +316,10 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   //Check current cone list and find same cone, if true add pose connection and cone observation
   bool firstCone = false;
   if(m_coneList.size() == 0){
+    Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,0), cones(1,0),cones(2,0));
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(0));
     Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
-
+    cone.addLocalObservation(localCone);
     cone.addObservation(globalCone);
     cone.addConnectedPoseId(m_poseId);
 
@@ -329,6 +330,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   double minDistance = 100;
   for(uint32_t i = 0; i<cones.cols(); i++){//Iterate through local cone objects
     double distanceToCar = cones(2,i);
+    Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i)); //Make local cone into global coordinate frame
     uint32_t j = 0;
     bool coneFound = false;
@@ -340,6 +342,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
         if(distance<m_newConeThreshold){ //NewConeThreshold is the accepted distance for a new cone candidate
           coneFound = true;
+          m_coneList[j].addLocalObservation(localCone);
           m_coneList[j].addObservation(globalCone);
           m_coneList[j].addConnectedPoseId(m_poseId);
 
@@ -354,6 +357,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     if(distanceToCar < m_coneMappingThreshold && !coneFound && !m_loopClosing){
       std::cout << "Trying to add cone" << std::endl;
       Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
+      cone.addLocalObservation(localCone);
       cone.addObservation(globalCone);  
       cone.addConnectedPoseId(m_poseId);
       m_coneList.push_back(cone);
@@ -451,16 +455,16 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
 
       for(uint32_t j = 0; j < connectedPoses.size(); j++){
           Eigen::Vector2d xyMeasurement;
-          xyMeasurement = getConeToPoseMeasurement(i,j,connectedPoses[j]);
-
+          xyMeasurement = getConeToPoseMeasurement(i,j);
+          std::cout << "x: " << xyMeasurement(0) << " y: " << xyMeasurement(1) << std::endl; 
           coneMeasurement->vertices()[0] = essentialGraph.vertex(connectedPoses[j]);
           coneMeasurement->vertices()[1] = essentialGraph.vertex(m_coneList[i].getId());
           coneMeasurement->setMeasurement(xyMeasurement);
 
           Eigen::Vector2d covXY = m_coneList[i].getCovariance();
           Eigen::Matrix2d informationMatrix;
-          informationMatrix << covXY(0),0,
-                              0,covXY(1);
+          informationMatrix << 1/covXY(0),0,
+                              0,1/covXY(1);
           coneMeasurement->setInformation(informationMatrix); //Placeholder value
           std::cout << "cX: " << covXY(0) << " cY: " << covXY(1) << std::endl;
           essentialGraph.addEdge(coneMeasurement);
@@ -472,8 +476,8 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
     g2o::VertexSE2* firstRobotPose = dynamic_cast<g2o::VertexSE2*>(essentialGraph.vertex(min));
     firstRobotPose->setFixed(true);
 
-    g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(essentialGraph.vertex(graphIndexStart));
-    firstCone->setFixed(true);
+    /*g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(essentialGraph.vertex(graphIndexStart));
+    firstCone->setFixed(true);*/
     std::cout << "Optimizing" << std::endl;
     essentialGraph.initializeOptimization();
     essentialGraph.optimize(10); //Add config for amount of iterations??
@@ -641,7 +645,7 @@ void Slam::addConeMeasurements(int i){
 
   for(uint32_t j = 0; j < connectedPoses.size(); j++){
   Eigen::Vector2d xyMeasurement;
-  xyMeasurement = getConeToPoseMeasurement(i,j,connectedPoses[j]);
+  xyMeasurement = getConeToPoseMeasurement(i,j);
 
   coneMeasurement->vertices()[0] = m_optimizer.vertex(connectedPoses[j]);
   coneMeasurement->vertices()[1] = m_optimizer.vertex(m_coneList[i].getId());
@@ -660,14 +664,12 @@ void Slam::addConeMeasurements(int i){
   //m_connectivityGraph[m_poseId-1001].push_back(cone.getId());
 }
 
-Eigen::Vector2d Slam::getConeToPoseMeasurement(int i,int j, int connectedPose){
+Eigen::Vector2d Slam::getConeToPoseMeasurement(int i,int j){
   
   Eigen::Vector2d cone;
   cone = m_coneList[i].getLocalConeObservation(j); 
-  Eigen::Vector2d pose;
-  pose << m_poses[connectedPose](0), m_poses[connectedPose](1);
   Eigen::Vector2d measurement;
-  measurement << cone(0)-pose(0), cone(1)-pose(1);  
+  measurement << cone(0), cone(1);  
 
   return measurement;
 }

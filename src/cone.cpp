@@ -96,6 +96,12 @@ void Cone::addObservation(Eigen::Vector3d observation){
   newObservation << observation(0),observation(1);
   m_observed.push_back(newObservation);
 }
+void Cone::addLocalObservation(Eigen::Vector3d observation){
+  Eigen::Vector2d newObservation;
+  newObservation << observation(0),observation(1);
+  m_localObserved.push_back(newObservation);
+
+}
 
 uint32_t Cone::getObservations(){
 
@@ -103,6 +109,10 @@ uint32_t Cone::getObservations(){
 }
 
 Eigen::Vector2d Cone::getLocalConeObservation(int i){
+
+  return m_localObserved[i];
+}
+Eigen::Vector2d Cone::getGlobalConeObservation(int i){
 
   return m_observed[i];
 }
@@ -122,19 +132,26 @@ void Cone::calculateMean(){
 Eigen::Vector2d Cone::getCovariance(){
 
   uint32_t observations = m_observed.size();
-  double varX = 0;
-  double varY = 0;
+  if(observations > 1){
+    double varX = 0;
+    double varY = 0;
 
-  for(uint32_t i = 0; i < observations; i++){
-    varX += (m_observed[i](0) - m_meanX)*(m_observed[i](0) - m_meanX);
-    varY += (m_observed[i](1) - m_meanY)*(m_observed[i](1) - m_meanY);
-  }  
-  varX = varX/observations;
-  varY = varY/observations;
+    for(uint32_t i = 0; i < observations; i++){
+      varX += (m_observed[i](0) - m_meanX)*(m_observed[i](0) - m_meanX);
+      varY += (m_observed[i](1) - m_meanY)*(m_observed[i](1) - m_meanY);
+    }  
+    varX = varX/observations;
+    varY = varY/observations;
   
-  Eigen::Vector2d covVec;
-  covVec << varX,varY;
-  return covVec; 
+    Eigen::Vector2d covVec;
+    covVec << varX,varY;
+    return covVec; 
+  }else{
+
+    Eigen::Vector2d covVec;
+    covVec << 0.5,0.5;
+    return covVec;
+  }
 }
 
 void Cone::addConnectedPoseId(int i){
