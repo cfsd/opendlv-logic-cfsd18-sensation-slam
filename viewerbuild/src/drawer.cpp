@@ -16,8 +16,8 @@ void Drawer::drawCones(){
     }    
     glBegin(GL_POINTS);
     for(uint32_t i = 0; i<nPoints; i++){
-        float x = static_cast<float>(m_cones[i].getX()/5);
-        float y = static_cast<float>(m_cones[i].getY()/5);
+        float x = static_cast<float>(m_cones[i].getMeanX()/5);
+        float y = static_cast<float>(m_cones[i].getMeanY()/5);
         float z = 0.0f;
         if(m_cones[i].getType() == 1){
             glColor3f(1.0,1.0,0.0);//yellow

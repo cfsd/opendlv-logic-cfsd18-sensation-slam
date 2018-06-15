@@ -74,13 +74,15 @@ public:
   void performSLAM(Eigen::MatrixXd Cones);
   void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void createFullGraph();
-  void createEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
+  void optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
+  void updateFromEssential(uint32_t poseStart, uint32_t poseEnd,uint32_t coneStart,uint32_t coneEnd, g2o::SparseOptimizer &essentialGraph);
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
   void addConeMeasurements(int i);
   Eigen::Vector2d getConeToPoseMeasurement(int i, int j,int connectedPose);
+  Eigen::Vector2d getLocalConeToPoseMeasurement(Eigen::Vector3d pose, Eigen::Vector2d cone);
   void addConesToGraph();
   void initializeCollection();
   bool loopClosing(Cone cone,double distance2car);
@@ -116,6 +118,7 @@ public:
   double m_coneMappingThreshold = 67;
   uint32_t m_currentConeIndex = 0;
   int m_poseId = 1000;
+  int m_coneRef = 0;
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;

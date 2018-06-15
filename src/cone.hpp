@@ -34,7 +34,6 @@ class Cone{
     opendlv::logic::perception::ObjectDirection getDirection(Eigen::Vector3d pose);
     opendlv::logic::perception::ObjectDistance getDistance(Eigen::Vector3d pose);
     
-    
     double getMeanX();
     double getMeanY();
     double getX();
@@ -53,7 +52,8 @@ class Cone{
     Eigen::Vector2d getCovariance();
     void addConnectedPoseId(int i);
     std::vector<int> getConnectedPoses();
-
+    void setOptimized();
+    bool isOptimized();
 
 
   private:
@@ -66,7 +66,7 @@ class Cone{
     double m_meanX = 0;
     double m_meanY = 0;
     std::vector<int> m_connectedPoses = {};
-
+    bool m_optimizedState = false;
 };
 
 #endif

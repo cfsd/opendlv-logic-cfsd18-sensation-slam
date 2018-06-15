@@ -54,7 +54,6 @@ opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pos
   msgDistance.distance(static_cast<float>(distance));
   return msgDistance;
 }
-
 double Cone::getMeanX(){
   return m_meanX;
 }
@@ -147,4 +146,13 @@ void Cone::addConnectedPoseId(int i){
 std::vector<int> Cone::getConnectedPoses(){
 
   return m_connectedPoses;
+}
+
+void Cone::setOptimized(){
+  m_optimizedState = true;
+}
+
+bool Cone::isOptimized(){
+
+  return m_optimizedState;
 }
