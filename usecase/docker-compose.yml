@@ -8,10 +8,10 @@ services:
         - .:/opt/opendlv.data
         command: "/opt/od4/bin/odsupercomponent --cid=${CID} --verbose=1 --configuration=/opt/opendlv.data/configuration"
 #    opendlv-logic-cfsd18-sensation-slam:
-#        image: "cfsdslam:latest"
+#        image: "slam:test"
 #        network_mode: "host"
 #        ipc: host
-#        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=112 --gatheringTimeMs=20 --sameConeThreshold=1.2 --refLatitude=57.70924648 --refLongitude=11.9462 --timeBetweenKeyframes=500 --coneMappingThreshold=50 --conesPerPacket=20"
+#        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=112 --gatheringTimeMs=20 --sameConeThreshold=1.2 --refLatitude=57.71395044 --refLongitude=11.94875904 --timeBetweenKeyframes=150 --coneMappingThreshold=20 --conesPerPacket=20"
     odcockpit:
         image: ${IMAGE}
         network_mode: host

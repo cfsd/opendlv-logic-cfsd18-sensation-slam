@@ -36,7 +36,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_odometryData()
 , m_gpsReference()
 , m_map()
-, m_keyframeTimeStamp()
+, m_keyframeTimeStamp(cluon::time::now())
 , m_newFrame()
 , m_sendPose()
 , m_sendMutex()
@@ -252,6 +252,29 @@ void Slam::initializeCollection(){
       //std::cout << extractedCones << std::endl;
       performSLAM(extractedCones);//Thread?
     }
+  }
+}
+
+void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
+  m_lastTimeStamp = currentFrameTime;
+  if(isKeyframe()){
+    Eigen::MatrixXd cones = Eigen::MatrixXd::Zero(4,currentFrame.size());
+    std::map<int,ConePackage>::iterator it;
+    int coneIndex = 0;
+    it =currentFrame.begin();
+    while(it != currentFrame.end()){
+      auto direction = std::get<0>(it->second);
+      auto distance = std::get<1>(it->second);
+      auto type = std::get<2>(it->second);
+      cones(0,coneIndex) = direction.azimuthAngle();
+      cones(1,coneIndex) = direction.zenithAngle();
+      cones(2,coneIndex) = distance.distance();
+      cones(3,coneIndex) = type.type();
+      coneIndex++;
+      it++;
+    }
+    std::cout << cones << std::endl;
+    performSLAM(cones);
   }
 }
 
@@ -847,17 +870,17 @@ void Slam::sendCones()
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
   //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
   cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
-  for(uint32_t i = 0; i<m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
+  for(uint32_t i = m_conesPerPacket; i>0;i--){ //Iterate through the cones ahead of time the path planning recieves
     int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
-    directionMsg.objectId(i);
+    directionMsg.objectId(i-1);
     od4.send(directionMsg,sampleTime,m_senderStamp);
     opendlv::logic::perception::ObjectDistance distanceMsg = m_map[index].getDistance(pose); //Extract cone distance
-    distanceMsg.objectId(i);
+    distanceMsg.objectId(i-1);
     od4.send(distanceMsg,sampleTime,m_senderStamp);
     opendlv::logic::perception::ObjectType typeMsg;
     typeMsg.type(m_map[index].getType()); //Extract cone type
-    typeMsg.objectId(i);
+    typeMsg.objectId(i-1);
     od4.send(typeMsg,sampleTime,m_senderStamp);
   }
 }
