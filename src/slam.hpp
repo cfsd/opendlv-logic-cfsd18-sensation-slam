@@ -52,7 +52,6 @@ private:
 public:
   Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Session &a_od4);
   ~Slam();
-  void nextCone(cluon::data::Envelope data);
   void nextPose(cluon::data::Envelope data);
   void nextSplitPose(cluon::data::Envelope data);
   void nextYawRate(cluon::data::Envelope data);
@@ -87,14 +86,12 @@ public:
   Eigen::Vector2d getConeToPoseMeasurement(int i, int j);
   Eigen::Vector2d getLocalConeToPoseMeasurement(Eigen::Vector3d pose, Eigen::Vector2d cone);
   void addConesToGraph();
-  void initializeCollection();
   double distanceBetweenCones(Cone c1, Cone c2);
   double distanceBetweenConesOpt(Cone c1, Cone c2);
   void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
   void sendCones();
   void sendPose();
   void writeToPoseAndMapFile();
-  //bool newCone(Eigen::MatrixXd cone,int poseId);
 
 
 

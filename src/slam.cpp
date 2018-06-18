@@ -63,93 +63,6 @@ void Slam::setupOptimizer(){
   m_optimizer.setVerbose(true);
 }
 
-void Slam::nextCone(cluon::data::Envelope data)
-{
-  //#####################Recieve Landmarks###########################
-  if (data.dataType() == opendlv::logic::perception::ObjectDirection::ID()) {
-    //std::cout << "Recieved Direction" << std::endl;
-    //Retrive data and timestamp
-    m_lastTimeStamp = data.sampleTimeStamp();
-    auto coneDirection = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
-    uint32_t objectId = coneDirection.objectId();
-    bool newFrameDir = false;
-    {
-      std::lock_guard<std::mutex> lockCone(m_coneMutex);
-      //Check last timestamp if they are from same message
-      //std::cout << "Message Recieved " << std::endl;
-      m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
-
-      m_coneCollector(0,objectId) = coneDirection.azimuthAngle();
-      m_coneCollector(1,objectId) = coneDirection.zenithAngle();
-
-//	std::cout << "FRAME BEFORE LOCAL: " << m_newFrame << std::endl;
-      newFrameDir = m_newFrame;
-      m_newFrame = false;
-    }
-
-	//std::cout << "FRAME: " << m_newFrame << std::endl;
-    if (newFrameDir){
-      
-      std::thread coneCollector (&Slam::initializeCollection,this);
-      coneCollector.detach();
-      
-    }
-  }
-
-  else if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
-    
-    m_lastTimeStamp = data.sampleTimeStamp();
-    auto coneDistance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
-    uint32_t objectId = coneDistance.objectId();
-    bool newFrameDist = false;
-    {
-      std::lock_guard<std::mutex> lockCone(m_coneMutex);
-      m_coneCollector(2,objectId) = coneDistance.distance();
-      m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
-	
-	//std::cout << "FRAME BEFORE LOCAL: " << m_newFrame << std::endl;
-      newFrameDist = m_newFrame;
-      m_newFrame = false;
-    }
-
-    //std::cout << "FRAME: " << m_newFrame << std::endl;
-    //Check last timestamp if they are from same message
-    //std::cout << "Message Recieved " << std::endl;
-    if (newFrameDist){
-       std::thread coneCollector(&Slam::initializeCollection, this);
-       coneCollector.detach();
-       //initializeCollection();
-    }
-  }
-
-  else if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
-    
-    //std::cout << "Recieved Type" << std::endl;
-    m_lastTimeStamp = data.sampleTimeStamp();
-    auto coneType = cluon::extractMessage<opendlv::logic::perception::ObjectType>(std::move(data));
-    uint32_t objectId = coneType.objectId();
-    bool newFrameType =false;
-    {          
-      std::lock_guard<std::mutex> lockCone(m_coneMutex);
-      m_lastObjectId = (m_lastObjectId<objectId)?(objectId):(m_lastObjectId);
-      m_coneCollector(3,objectId) = coneType.type();
-      newFrameType = m_newFrame;
-      m_newFrame = false;
-    }
-
-    std::cout << "FRAME: " << m_newFrame << std::endl;
-    //Check last timestamp if they are from same message
-    //std::cout << "Message Recieved " << std::endl;
-    if (newFrameType){
-      std::thread coneCollector (&Slam::initializeCollection,this); //just sleep instead maybe since this is unclear how it works
-      coneCollector.detach();
-      //initializeCollection();
-
-    }
-  }
-
-}
-
 void Slam::nextSplitPose(cluon::data::Envelope data){
   std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
   if(data.dataType() == opendlv::proxy::GeodeticWgs84Reading::ID()){
@@ -217,44 +130,6 @@ void Slam::nextYawRate(cluon::data::Envelope data){
    //std::cout << "Yaw in message: " << m_yawRate << std::endl;
 }
 
-void Slam::initializeCollection(){
-  //std::this_thread::sleep_for(std::chrono::duration 1s); //std::chrono::milliseconds(m_timeDiffMilliseconds)
-
-  bool sleep = true;
-  auto start = std::chrono::system_clock::now();
-
-  while(sleep)
-  {
-    auto now = std::chrono::system_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - start);
-    if ( elapsed.count() > m_timeDiffMilliseconds*1000 )
-        sleep = false;
-  }
-
-
-  Eigen::MatrixXd extractedCones;
-  {
-    std::lock_guard<std::mutex> lockCone(m_coneMutex);
-    
-	//std::cout << "FRAME IN LOCK: " << m_newFrame << std::endl;
-    extractedCones = m_coneCollector.leftCols(m_lastObjectId+1);
-    m_newFrame = true;
-    m_lastObjectId = 0;
-    m_coneCollector = Eigen::MatrixXd::Zero(4,1000);
-  }
-  //Initialize for next collection
-  std::cout << "Collection done: " << extractedCones.cols() << std::endl;
-  if(extractedCones.cols() > 0){
-    //std::cout << "Extracted Cones " << std::endl;
-    //std::cout << extractedCones << std::endl;
-    if(isKeyframe()){//Can add check to make sure only one process is running at a time
-      //std::cout << "Extracted Cones " << std::endl;
-      //std::cout << extractedCones << std::endl;
-      performSLAM(extractedCones);//Thread?
-    }
-  }
-}
-
 void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
   m_lastTimeStamp = currentFrameTime;
   if(isKeyframe()){
@@ -273,7 +148,6 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
       coneIndex++;
       it++;
     }
-    std::cout << cones << std::endl;
     performSLAM(cones);
   }
 }
