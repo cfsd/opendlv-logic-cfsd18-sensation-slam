@@ -243,7 +243,7 @@ void Slam::initializeCollection(){
     m_coneCollector = Eigen::MatrixXd::Zero(4,1000);
   }
   //Initialize for next collection
-  std::cout << "Collection done" << extractedCones.cols() << std::endl;
+  std::cout << "Collection done: " << extractedCones.cols() << std::endl;
   if(extractedCones.cols() > 0){
     //std::cout << "Extracted Cones " << std::endl;
     //std::cout << extractedCones << std::endl;
@@ -295,7 +295,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     uint32_t currentEndCone = m_coneList.size() - 1; 
     uint32_t coneDiff = currentEndCone - m_coneRef;
     std::cout << "coneD: " << coneDiff << std::endl; 
-    if(coneDiff >= 10){
+    if(coneDiff >= 10 && !m_loopClosingComplete){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
 
@@ -321,8 +321,127 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       }
     }
 
+    //Map preprocessing
     //Localizer
+    if(m_loopClosingComplete){
+
+      
+      localizer(cones, pose);
+
+      sendPose();
+      sendCones();
+    }
+
 }
+
+void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
+
+  g2o::SparseOptimizer localGraph;
+  typedef g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1> > slamBlockSolver;
+  typedef g2o::LinearSolverEigen<slamBlockSolver::PoseMatrixType> slamLinearSolver;
+  
+  auto linearSolver = g2o::make_unique<slamLinearSolver>();
+  linearSolver->setBlockOrdering(false);
+  
+  g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
+  localGraph.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
+  localGraph.setVerbose(true);
+
+  std::lock_guard<std::mutex> lockMap(m_mapMutex);
+  //Find match in conelist
+  std::vector<int> matchedConeIndex;
+  std::vector<Eigen::Vector3d> localObs;
+  double shortestDistance = 10000;
+  for(uint32_t i = 0; i < cones.cols(); i++){
+    bool foundMatch = false;
+    uint32_t j = 0;
+    while(!foundMatch && j < m_coneList.size()){
+      Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
+      Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
+      double distance = distanceBetweenCones(m_coneList[j],globalConeObject);
+
+      if(distance < 0.5){ //m_newConeThreshold
+        matchedConeIndex.push_back(j);
+
+        Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
+        localObs.push_back(localCone);
+        foundMatch = true;
+
+        if(distance < shortestDistance){
+
+          shortestDistance = distance;
+          m_currentConeIndex = m_coneList[j].getId();
+
+        }
+      }
+
+      j++;
+    }
+
+  }
+
+  if(matchedConeIndex.size() > 0){  
+    //Create graph
+    //Add pose vertex
+    g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
+    poseVertex->setId(1000);
+    poseVertex->setEstimate(pose);
+    localGraph.addVertex(poseVertex);
+
+    //Add cone vertex
+    Eigen::Vector2d coneMeanXY;
+    for(uint32_t i = 0; i < matchedConeIndex.size(); i++){
+
+      g2o::EdgeSE2PointXY* coneMeasurement = new g2o::EdgeSE2PointXY;
+      coneMeanXY << m_coneList[matchedConeIndex[i]].getOptX(),m_coneList[matchedConeIndex[i]].getOptY();
+      g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
+      coneVertex->setId(i);
+      coneVertex->setEstimate(coneMeanXY);
+      coneVertex->setFixed(true);      
+      localGraph.addVertex(coneVertex);
+
+      //Add edge between pose and cone i
+      Eigen::Vector2d xyMeasurement;
+      coneMeasurement->vertices()[0] = localGraph.vertex(i);
+      coneMeasurement->vertices()[1] = localGraph.vertex(1000);
+      xyMeasurement << localObs[i](0),localObs[i](1);
+      coneMeasurement->setMeasurement(xyMeasurement);
+
+      //Eigen::Vector2d covXY = m_coneList[matchedConeIndex[i]].getCovariance();
+      Eigen::Matrix2d informationMatrix;
+      informationMatrix << 1/10,0,
+                              0,1/10;
+      coneMeasurement->setInformation(informationMatrix);
+      localGraph.addEdge(coneMeasurement);
+
+    }
+
+
+
+    /*g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(localGraph.vertex(0));
+    firstCone->setFixed(true);*/
+    std::cout << "Optimizing" << std::endl;
+    localGraph.initializeOptimization();
+    localGraph.optimize(10); //Add config for amount of iterations??
+    std::cout << "Optimizing done." << std::endl;
+
+
+
+  
+
+    g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(localGraph.vertex(1000));
+    g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
+    Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
+  
+    {
+      std::lock_guard<std::mutex> lockSend(m_sendMutex); 
+      m_sendPose << updatedPose(0),updatedPose(1),updatedPose(2);
+    }
+
+  }
+
+}
+
 
 void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
@@ -415,7 +534,6 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
 
     uint32_t max = *std::max_element(posesToGraph.begin(), posesToGraph.end());
     uint32_t min = *std::min_element(posesToGraph.begin(), posesToGraph.end());
-    std::cout << "start Essentail: " << min << " | end essentail: " << max << std::endl;
 
     //add poses to graph based on min and max
     for(uint32_t k = min; k < max+1; k++){
@@ -609,6 +727,7 @@ void Slam::fullBA(){
 }
 
 
+
 Eigen::Vector3d Slam::coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd cones){
   Eigen::Vector3d cone = Spherical2Cartesian(cones(0), cones(1), cones(2));
   //convert from local to global coordsystem
@@ -759,23 +878,14 @@ void Slam::sendPose(){
   od4.send(poseMessage, sampleTime ,m_senderStamp);
 }
 
-bool Slam::loopClosing(Cone cone,double distance2car){
-  //Eigen::Vector2d initialCone;
-  //initialCone << m_map[0].getX(),m_map[0].getY();
-  double loopClosingCandidateDistance = distanceBetweenCones(m_map[0], cone);
-  //std::sqrt( (initialCone(0)-cone.getX())*(initialCone(0)-cone.getX()) + (initialCone(1)-cone.getY())*(initialCone(1)-cone.getY()));
-  if(loopClosingCandidateDistance < 1 && m_currentConeIndex > 20 && distance2car < m_coneMappingThreshold){
-    
-    //writeToPoseAndMapFile(); //Set threshold in congig ??
-    return true;
-  } 
-  return false;
-}
-
 double Slam::distanceBetweenCones(Cone c1, Cone c2){
   c1.calculateMean();
   c2.calculateMean();
   double distance = std::sqrt( (c1.getMeanX()-c2.getMeanX())*(c1.getMeanX()-c2.getMeanX()) + (c1.getMeanY()-c2.getMeanY())*(c1.getMeanY()-c2.getMeanY()) );
+  return distance;
+}
+double Slam::distanceBetweenConesOpt(Cone c1, Cone c2){
+  double distance = std::sqrt( (c1.getOptX()-c2.getMeanX())*(c1.getOptX()-c2.getMeanX()) + (c1.getOptY()-c2.getMeanY())*(c1.getOptY()-c2.getMeanY()) );
   return distance;
 }
 
@@ -790,13 +900,7 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
       m_essentialMap.push_back(m_coneList[i]);
     }
   }
-  
-
-
-
 }
-   
-  
 
 void Slam::setUp(std::map<std::string, std::string> configuration)
 {
