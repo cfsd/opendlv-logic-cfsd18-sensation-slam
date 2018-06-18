@@ -163,14 +163,8 @@ void Drawer::drawGraph(){
     if(nPoints == 0){
         return;
     }
-    m_cones = slam.drawCones();
+    m_cones = slam.drawLocalOptimizedCones();
     nPoints = static_cast<unsigned int>(m_cones.size());
-    if(nPoints == 0){
-        return;
-    }
-
-    std::vector<std::vector<int>> graph = slam.drawGraph();
-    nPoints = static_cast<unsigned int>(graph.size());
     if(nPoints == 0){
         return;
     }
@@ -179,12 +173,11 @@ void Drawer::drawGraph(){
         glColor4f(0.0f,1.0f,0.0f,0.6f);
         glBegin(GL_LINES);
 
-    for(uint32_t i = 0; i < graph.size(); i++ ){
-
-        for(uint32_t j = 0; j < graph[i].size(); j++){
-            uint32_t coneId = graph[i][j];
-            glVertex3f(static_cast<float>(m_poses[i](0)/5),static_cast<float>(m_poses[i](1)/5),0.0f);
-            glVertex3f(static_cast<float>(m_cones[coneId].getX()/5),static_cast<float>(m_cones[coneId].getY()/5),0.0f);
+    for(uint32_t i = 0; i < m_cones.size(); i++ ){
+        std::vector<int> connections = m_cones[i].getConnectedPoses();
+        for(uint32_t j = 0; j < connections.size(); j++){
+            glVertex3f(static_cast<float>(m_poses[connections[j]-1000](0)/5),static_cast<float>(m_poses[connections[j]-1000](1)/5),0.0f);
+            glVertex3f(static_cast<float>(m_cones[i].getOptX()/5),static_cast<float>(m_cones[i].getOptY()/5),0.0f);
         }
     }
     glEnd();

@@ -168,7 +168,6 @@ Eigen::Vector2d Cone::getCovariance(){
     }  
     varX = varX/observations;
     varY = varY/observations;
-  
     Eigen::Vector2d covVec;
     covVec << varX,varY;
     return covVec; 

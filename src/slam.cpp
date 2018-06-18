@@ -297,7 +297,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     std::cout << "coneD: " << coneDiff << std::endl; 
     if(coneDiff >= 10){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
-      //optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
+      optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
 
        m_coneRef = currentEndCone; 
     }
@@ -320,6 +320,8 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
         m_loopClosingComplete = true;
       }
     }
+
+    //Localizer
 }
 
 void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
