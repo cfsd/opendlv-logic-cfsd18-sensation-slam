@@ -189,20 +189,19 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       createConnections(cones,pose);
     }
+
     uint32_t currentEndCone = m_coneList.size() - 1; 
     uint32_t coneDiff = currentEndCone - m_coneRef;
-    std::cout << "coneD: " << coneDiff << std::endl; 
+
     if(coneDiff >= 10 && !m_loopClosingComplete){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
-
-       m_coneRef = currentEndCone; 
+      m_coneRef = currentEndCone; 
     }
 
     m_poseId++;
-    //Decide when to create essential graphs
 
-    //Decide when to create graph
+    //Check if there is enough loopclosing candidates
     if(!m_loopClosingComplete){
       int loopClosers = 0;
         std::lock_guard<std::mutex> lockMap(m_mapMutex);
@@ -215,10 +214,17 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       if(loopClosers > 1){
         fullBA();
         m_loopClosingComplete = true;
+        //m_filterMap = true;
       }
     }
 
     //Map preprocessing
+    /*if(m_filterMap){
+
+      std::lock_guard<std::mutex> lockMap(m_mapMutex);
+      filterMap();
+    }*/
+
     //Localizer
     if(m_loopClosingComplete){
 
@@ -257,7 +263,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
       double distance = distanceBetweenCones(m_coneList[j],globalConeObject);
 
-      if(distance < 0.5){ //m_newConeThreshold
+      if(distance < m_newConeThreshold){ //m_newConeThreshold
         matchedConeIndex.push_back(j);
 
         Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
@@ -299,15 +305,15 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
       //Add edge between pose and cone i
       Eigen::Vector2d xyMeasurement;
-      coneMeasurement->vertices()[0] = localGraph.vertex(i);
-      coneMeasurement->vertices()[1] = localGraph.vertex(1000);
+      coneMeasurement->vertices()[0] = localGraph.vertex(1000);
+      coneMeasurement->vertices()[1] = localGraph.vertex(i);
       xyMeasurement << localObs[i](0),localObs[i](1);
       coneMeasurement->setMeasurement(xyMeasurement);
 
       //Eigen::Vector2d covXY = m_coneList[matchedConeIndex[i]].getCovariance();
       Eigen::Matrix2d informationMatrix;
-      informationMatrix << 1/10,0,
-                              0,1/10;
+      informationMatrix << 1/0.1,0,
+                              0,1/0.1;
       coneMeasurement->setInformation(informationMatrix);
       localGraph.addEdge(coneMeasurement);
 
@@ -798,6 +804,11 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
     }
   }
 }
+
+/*void Slam::filterMap(){
+
+
+}*/
 
 void Slam::setUp(std::map<std::string, std::string> configuration)
 {

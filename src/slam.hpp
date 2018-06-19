@@ -133,6 +133,7 @@ public:
   cluon::data::TimeStamp m_yawReceivedTime = {};
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
   std::vector<Cone> m_coneList = {};
+  //bool m_filterMap = false;
   
 
     // Constants for degree transformation
