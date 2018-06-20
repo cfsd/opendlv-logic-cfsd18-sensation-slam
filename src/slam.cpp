@@ -813,46 +813,6 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
     }
   }
 
-  //Recalculate ID's
-  if(updateToGlobal){
-    //Set all ID's to 1000
-    std::vector<Cone> tempMap;
-    std::vector<uint32_t> indexToMap;
-    indexToMap.push_back(0);
-    for(uint32_t i = 0; i < m_map.size(); i++){
-      m_map[i].setId(1000);
-    }
-    m_map[0].setId(0);
-    //Yes
-    for(uint32_t i = 0; i < m_map.size(); i++){
-      double distance = 1000;
-      uint32_t closestIndex;
-      for(uint32_t j = 0; j < m_map.size(); j++){
-
-          if(i != j && m_map[j].getId() == 1000){
-            double currDistance = std::sqrt( (m_map[i].getOptX() - m_map[j].getOptX())*(m_map[i].getOptX() - m_map[j].getOptX()) + (m_map[i].getOptY() - m_map[j].getOptY())*(m_map[i].getOptY() - m_map[j].getOptY()) );
-            if(currDistance < distance){
-
-              closestIndex = j;
-
-            }
-
-          }
-
-      }    
-      indexToMap.push_back(closestIndex);  
-    }
-
-    //resuffle map
-    for(uint32_t i = 0; i < m_map.size(); i++){
-      tempMap.push_back(m_map[indexToMap[i]]);
-    }
-    m_map.clear();
-    for(uint32_t i = 0; i < m_map.size(); i++){
-      m_map.push_back(tempMap[i]);
-    }
-  }
-
 }
 
 void Slam::filterMap(){
