@@ -759,7 +759,7 @@ void Slam::sendCones()
   }//mapmutex too
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
   //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
-  cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
+  cluon::data::TimeStamp sampleTime = m_lastTimeStamp;
   for(uint32_t i = 0; i< m_conesPerPacket+4;i++){ //Iterate through the cones ahead of time the path planning recieves
     int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i-4):(m_currentConeIndex+i-m_map.size()-4); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
@@ -803,18 +803,56 @@ double Slam::distanceBetweenConesOpt(Cone c1, Cone c2){
 }
 
 void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
-  int addCounter = 0;
   for(uint32_t i = start; i < end; i++){
 
     if(updateToGlobal && m_coneList[i].isValid()){
       m_map.push_back(m_coneList[i]);
-      m_map[addCounter].setId(addCounter);
-      addCounter++;
     }else{
 
       m_essentialMap.push_back(m_coneList[i]);
     }
   }
+
+  //Recalculate ID's
+  if(updateToGlobal){
+    //Set all ID's to 1000
+    std::vector<Cone> tempMap;
+    std::vector<uint32_t> indexToMap;
+    indexToMap.push_back(0);
+    for(uint32_t i = 0; i < m_map.size(); i++){
+      m_map[i].setId(1000);
+    }
+    m_map[0].setId(0);
+    //Yes
+    for(uint32_t i = 0; i < m_map.size(); i++){
+      double distance = 1000;
+      uint32_t closestIndex;
+      for(uint32_t j = 0; j < m_map.size(); j++){
+
+          if(i != j && m_map[j].getId() == 1000){
+            double currDistance = std::sqrt( (m_map[i].getOptX() - m_map[j].getOptX())*(m_map[i].getOptX() - m_map[j].getOptX()) + (m_map[i].getOptY() - m_map[j].getOptY())*(m_map[i].getOptY() - m_map[j].getOptY()) );
+            if(currDistance < distance){
+
+              closestIndex = j;
+
+            }
+
+          }
+
+      }    
+      indexToMap.push_back(closestIndex);  
+    }
+
+    //resuffle map
+    for(uint32_t i = 0; i < m_map.size(); i++){
+      tempMap.push_back(m_map[indexToMap[i]]);
+    }
+    m_map.clear();
+    for(uint32_t i = 0; i < m_map.size(); i++){
+      m_map.push_back(tempMap[i]);
+    }
+  }
+
 }
 
 void Slam::filterMap(){
