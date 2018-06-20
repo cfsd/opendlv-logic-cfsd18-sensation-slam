@@ -760,8 +760,8 @@ void Slam::sendCones()
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
   //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
   cluon::data::TimeStamp sampleTime = m_lastTimeStamp;
-  for(uint32_t i = 0;i<m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
-    int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
+  for(uint32_t i = 0; i< m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
+    int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i-4):(m_currentConeIndex+i-m_map.size()-4); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
     directionMsg.objectId(m_conesPerPacket-1-i);
     od4.send(directionMsg,sampleTime,m_senderStamp);
@@ -803,11 +803,13 @@ double Slam::distanceBetweenConesOpt(Cone c1, Cone c2){
 }
 
 void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
-
+  int addCounter = 0;
   for(uint32_t i = start; i < end; i++){
 
     if(updateToGlobal && m_coneList[i].isValid()){
       m_map.push_back(m_coneList[i]);
+      m_map[addCounter].setId(addCounter);
+      addCounter++;
     }else{
 
       m_essentialMap.push_back(m_coneList[i]);
