@@ -56,6 +56,7 @@ public:
   void nextSplitPose(cluon::data::Envelope data);
   void nextYawRate(cluon::data::Envelope data);
   std::vector<Cone> drawCones();
+  std::vector<Cone> drawRawCones();
   std::vector<Cone> drawLocalOptimizedCones();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
@@ -73,7 +74,7 @@ public:
   Eigen::Vector3d updatePoseFromGraph();
   void addPosesToGraph();
   void performSLAM(Eigen::MatrixXd Cones);
-  void localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  void localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptimization);
   void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void createFullGraph();
   void optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
@@ -89,6 +90,7 @@ public:
   double distanceBetweenCones(Cone c1, Cone c2);
   double distanceBetweenConesOpt(Cone c1, Cone c2);
   void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
+  void filterMap();
   void sendCones();
   void sendPose();
   void writeToPoseAndMapFile();
@@ -133,7 +135,7 @@ public:
   cluon::data::TimeStamp m_yawReceivedTime = {};
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
   std::vector<Cone> m_coneList = {};
-  //bool m_filterMap = false;
+  bool m_filterMap = false;
   
 
     // Constants for degree transformation

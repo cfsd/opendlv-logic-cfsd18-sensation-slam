@@ -92,6 +92,7 @@ void Slam::nextSplitPose(cluon::data::Envelope data){
     heading = (heading > PI)?(heading-2*PI):(heading);
     heading = (heading < -PI)?(heading+2*PI):(heading);
     m_odometryData(2) = heading;
+    //std::cout << "head: " << heading << std::endl;
   }
 }
 
@@ -119,6 +120,7 @@ void Slam::nextPose(cluon::data::Envelope data){
   m_odometryData << WGS84Reading[0],
                     WGS84Reading[1],
                     odometry.heading();
+  std::cout << "head: " << odometry.heading() << std::endl;                   
 }
 
 void Slam::nextYawRate(cluon::data::Envelope data){
@@ -185,6 +187,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     m_poses.push_back(pose);
   }
 
+  if(!m_loopClosingComplete){
     {
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
       createConnections(cones,pose);
@@ -198,6 +201,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       optimizeEssentialGraph(currentEndCone-coneDiff, currentEndCone);
       m_coneRef = currentEndCone; 
     }
+  }
 
     m_poseId++;
 
@@ -214,22 +218,25 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       if(loopClosers > 1){
         fullBA();
         m_loopClosingComplete = true;
-        //m_filterMap = true;
+        m_filterMap = true;
       }
     }
 
     //Map preprocessing
-    /*if(m_filterMap){
+    if(m_filterMap){
 
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
+      std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
       filterMap();
-    }*/
+      updateMap(0,m_coneList.size(),true);
+      m_filterMap = false;
+    }
 
     //Localizer
     if(m_loopClosingComplete){
 
       
-      localizer(cones, pose);
+      localizer(cones, pose, false);
 
       sendPose();
       sendCones();
@@ -237,7 +244,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 
 }
 
-void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
+void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptimization){
 
   g2o::SparseOptimizer localGraph;
   typedef g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1> > slamBlockSolver;
@@ -283,7 +290,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
   }
 
-  if(matchedConeIndex.size() > 0){  
+  if(matchedConeIndex.size() > 0 && poseOptimization){  
     //Create graph
     //Add pose vertex
     g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
@@ -339,8 +346,11 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     {
       std::lock_guard<std::mutex> lockSend(m_sendMutex); 
       m_sendPose << updatedPose(0),updatedPose(1),updatedPose(2);
+      std::cout << "pose: " << updatedPose(0) << " : " << updatedPose(1) << " : " << updatedPose(2) << std::endl;
     }
 
+  }else{
+    m_sendPose << pose(0),pose(1),pose(2);
   }
 
 }
@@ -625,7 +635,7 @@ void Slam::fullBA(){
     Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
     m_poses[i] << updatedPose(0),updatedPose(1),updatedPose(2);
   }
-  updateMap(0,m_coneList.size(),true);
+  //updateMap(0,m_coneList.size(),true);
 
 }
 
@@ -796,7 +806,7 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
 
   for(uint32_t i = start; i < end; i++){
 
-    if(updateToGlobal){
+    if(updateToGlobal && m_coneList[i].isValid()){
       m_map.push_back(m_coneList[i]);
     }else{
 
@@ -805,10 +815,82 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
   }
 }
 
-/*void Slam::filterMap(){
+void Slam::filterMap(){
+
+  //Filter on mean and optimized value
+  for(uint32_t i = 0; i < m_coneList.size(); i++){
+    double distance = distanceBetweenConesOpt(m_coneList[i],m_coneList[i]);
+    if(distance > m_newConeThreshold){
+      m_coneList[i].setValidState(false);
+
+    }
+  }
+
+  for(uint32_t i = 0; i < m_coneList.size(); i++){
+
+      for(uint32_t j = 0; j < m_coneList.size(); j++){
+        if(i != j){
+          double distance = std::sqrt( (m_coneList[i].getOptX() - m_coneList[j].getOptX() )*(m_coneList[i].getOptX() - m_coneList[j].getOptX()) + (m_coneList[i].getOptY() - m_coneList[j].getOptY())*(m_coneList[i].getOptY() - m_coneList[j].getOptY()) );
+
+          if(distance < m_newConeThreshold && m_coneList[i].isValid() && m_coneList[j].isValid()){
+            m_coneList[j].setValidState(false);
+          }
+        } 
+      }
+  }  
 
 
-}*/
+  //Check closest pose didstance
+  for(uint32_t i = 0; i < m_coneList.size(); i++){
+    
+    double closestPoseDistance = 10000;
+    for(uint32_t j = 0; j < m_poses.size(); j++){
+
+      double distance = std::sqrt( (m_poses[j](0)-m_coneList[i].getOptX())*(m_poses[j](0)-m_coneList[i].getOptX()) + (m_poses[j](1)-m_coneList[i].getOptY())*(m_poses[j](1)-m_coneList[i].getOptY()) );
+      if(distance < closestPoseDistance){
+        closestPoseDistance = distance;
+      }
+
+    }
+
+    if(closestPoseDistance > 3){
+      m_coneList[i].setValidState(false);
+    }
+  }
+
+  //Check colours
+
+  for(uint32_t i = 0; i < m_coneList.size(); i++){
+    double distance = 10000;
+    double azimuth = 1000;
+    if(m_coneList[i].getType() == 0){
+      for(uint32_t j = 0; j < m_coneList[i].getObservations(); j++ ){
+        
+        Eigen::Vector2d localObs = m_coneList[i].getLocalConeObservation(j);
+        double localDistance = std::sqrt( localObs(0)*localObs(0) + localObs(1)*localObs(1) );
+        if(localDistance < distance){
+          distance = localDistance;
+          azimuth = std::atan2(localObs(1),localObs(0));
+        }
+      }
+
+
+      if(azimuth > 0.1 ){
+
+        m_coneList[i].setType(1);
+
+        std::cout << "New type yellow" << std::endl;
+      }else if(azimuth < -0.1){
+        m_coneList[i].setType(2);
+        std::cout << "New type blue" << std::endl;
+      }
+    }
+
+
+  }
+
+
+}
 
 void Slam::setUp(std::map<std::string, std::string> configuration)
 {
@@ -840,6 +922,10 @@ std::vector<Eigen::Vector3d> Slam::drawPoses(){
 std::vector<Cone> Slam::drawCones(){
   std::lock_guard<std::mutex> lock(m_mapMutex);
   return m_map;
+}
+std::vector<Cone> Slam::drawRawCones(){
+  std::lock_guard<std::mutex> lock(m_mapMutex);
+  return m_coneList;
 }
 std::vector<Cone> Slam::drawLocalOptimizedCones(){
   std::lock_guard<std::mutex> lock(m_mapMutex);

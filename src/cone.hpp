@@ -59,6 +59,8 @@ class Cone{
     void setOptimized();
     bool isOptimized();
     bool getLoopClosingState();
+    void setValidState(bool state);
+    bool isValid();
 
   private:
     double m_x;
@@ -75,6 +77,7 @@ class Cone{
     bool m_looperCandidate = false;
     double m_optX = 0;
     double m_optY = 0;
+    bool m_validState = true;
 };
 
 #endif

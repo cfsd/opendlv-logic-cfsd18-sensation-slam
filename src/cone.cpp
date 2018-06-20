@@ -195,3 +195,11 @@ bool Cone::isOptimized(){
 bool Cone::getLoopClosingState(){
   return m_looperCandidate;
 }
+void Cone::setValidState(bool state){
+
+  m_validState = state;
+}
+
+bool Cone::isValid(){
+  return m_validState;
+}
