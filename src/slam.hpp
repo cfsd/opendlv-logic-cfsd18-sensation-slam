@@ -80,6 +80,7 @@ public:
   void optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
   void updateFromEssential(uint32_t poseStart, uint32_t poseEnd,uint32_t coneStart,uint32_t coneEnd, g2o::SparseOptimizer &essentialGraph);
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
+  int updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex);
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);

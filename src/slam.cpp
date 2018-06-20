@@ -230,6 +230,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       filterMap();
       updateMap(0,m_coneList.size(),true);
       m_filterMap = false;
+      m_currentConeIndex = 0;
     }
 
     //Localizer
@@ -242,6 +243,19 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       sendCones();
     }
 
+}
+
+int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex){
+  currentConeIndex=(currentConeIndex<m_map.size())?(currentConeIndex):(currentConeIndex-m_map.size());
+  Cone currentCone = m_map[currentConeIndex];
+  auto distance = currentCone.getDistance(pose);
+  auto direction = currentCone.getDirection(pose);
+  std::cout << "hej" << std::endl;
+  if(distance.distance() < 10.0f && fabs(direction.azimuthAngle())>80.0f){
+    currentConeIndex++;
+    currentConeIndex = updateCurrentCone(pose,currentConeIndex);
+  }
+  return currentConeIndex;
 }
 
 void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptimization){
@@ -261,7 +275,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptim
   //Find match in conelist
   std::vector<int> matchedConeIndex;
   std::vector<Eigen::Vector3d> localObs;
-  double shortestDistance = 10000;
+  //double shortestDistance = 10000;
   for(uint32_t i = 0; i < cones.cols(); i++){
     bool foundMatch = false;
     uint32_t j = 0;
@@ -276,19 +290,23 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptim
         Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
         localObs.push_back(localCone);
         foundMatch = true;
-
+/*
         if(distance < shortestDistance){
 
           shortestDistance = distance;
-          m_currentConeIndex = m_map[j].getId();
+          //m_currentConeIndex = m_map[j].getId();
 
         }
+        */
       }
 
       j++;
     }
 
   }
+  std::cout << "Current Cone is (before): " << m_currentConeIndex << std::endl;
+  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex);
+  std::cout << "Current Cone is (after): " << m_currentConeIndex << std::endl;
 
   if(matchedConeIndex.size() > 0 && poseOptimization){  
     //Create graph
@@ -761,7 +779,7 @@ void Slam::sendCones()
   //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
   cluon::data::TimeStamp sampleTime = m_lastTimeStamp;
   for(uint32_t i = 0; i< m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
-    int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i-4):(m_currentConeIndex+i-m_map.size()-4); //Check if more cones is sent than there exists
+    int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
     directionMsg.objectId(m_conesPerPacket-1-i);
     od4.send(directionMsg,sampleTime,m_senderStamp);
@@ -803,15 +821,11 @@ double Slam::distanceBetweenConesOpt(Cone c1, Cone c2){
 }
 
 void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
-  int addCounter = 0;
   for(uint32_t i = start; i < end; i++){
 
     if(updateToGlobal && m_coneList[i].isValid()){
       m_map.push_back(m_coneList[i]);
-      m_map[addCounter].setId(addCounter);
-      addCounter++;
     }else{
-
       m_essentialMap.push_back(m_coneList[i]);
     }
   }
