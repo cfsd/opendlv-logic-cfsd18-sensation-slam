@@ -236,7 +236,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     if(m_loopClosingComplete){
 
       
-      localizer(cones, pose, false);
+      localizer(cones, pose, false); //False or True for pose optimization
 
       sendPose();
       sendCones();
@@ -265,10 +265,10 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptim
   for(uint32_t i = 0; i < cones.cols(); i++){
     bool foundMatch = false;
     uint32_t j = 0;
-    while(!foundMatch && j < m_coneList.size()){
+    while(!foundMatch && j < m_map.size()){
       Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
       Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
-      double distance = distanceBetweenCones(m_coneList[j],globalConeObject);
+      double distance = distanceBetweenCones(m_map[j],globalConeObject);
 
       if(distance < m_newConeThreshold){ //m_newConeThreshold
         matchedConeIndex.push_back(j);
@@ -280,7 +280,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptim
         if(distance < shortestDistance){
 
           shortestDistance = distance;
-          m_currentConeIndex = m_coneList[j].getId();
+          m_currentConeIndex = m_map[j].getId();
 
         }
       }
@@ -303,7 +303,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptim
     for(uint32_t i = 0; i < matchedConeIndex.size(); i++){
 
       g2o::EdgeSE2PointXY* coneMeasurement = new g2o::EdgeSE2PointXY;
-      coneMeanXY << m_coneList[matchedConeIndex[i]].getOptX(),m_coneList[matchedConeIndex[i]].getOptY();
+      coneMeanXY << m_map[matchedConeIndex[i]].getOptX(),m_map[matchedConeIndex[i]].getOptY();
       g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
       coneVertex->setId(i);
       coneVertex->setEstimate(coneMeanXY);
