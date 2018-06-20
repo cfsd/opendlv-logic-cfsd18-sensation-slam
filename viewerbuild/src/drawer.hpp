@@ -15,7 +15,9 @@ class Drawer{
     public:
         Drawer(std::map<std::string,std::string> commandlineArgs, Slam &slam);
         void drawPoses();
-        void drawCones();
+        void drawRawCones();
+        void drawOptimizedCones();
+        void drawEssentialCones();
         void drawCurrentPose();
         void drawGraph();
 

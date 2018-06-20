@@ -54,7 +54,20 @@ opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pos
   msgDistance.distance(static_cast<float>(distance));
   return msgDistance;
 }
+double Cone::getOptX(){
 
+  return m_optX;
+}
+double Cone::getOptY(){
+
+  return m_optY;
+}
+void Cone::setOptX(double x){
+  m_optX = x;
+}
+void Cone::setOptY(double y){
+  m_optY = y;
+}
 double Cone::getMeanX(){
   return m_meanX;
 }
@@ -92,10 +105,26 @@ void Cone::setType(int type){
 void Cone::setId(int id){
   m_id = id;
 }
-void Cone::addObservation(Eigen::Vector3d observation){
-  Eigen::Vector2d newObservation;
-  newObservation << observation(0),observation(1);
-  m_observed.push_back(newObservation);
+void Cone::addObservation(Eigen::Vector3d localObservation,Eigen::Vector3d globalObservation,int i,int currConeId){
+
+  Eigen::Vector2d newLocalObservation;
+  newLocalObservation << localObservation(0),localObservation(1);
+  m_localObserved.push_back(newLocalObservation);
+
+  Eigen::Vector2d newGlobalObservation;
+  newGlobalObservation << globalObservation(0),globalObservation(1);
+  m_observed.push_back(newGlobalObservation);
+
+  m_connectedPoses.push_back(i);
+  if(!m_looperCandidate && currConeId > 20){
+    uint32_t max = *std::max_element(m_connectedPoses.begin(), m_connectedPoses.end());
+    uint32_t min = *std::min_element(m_connectedPoses.begin(), m_connectedPoses.end());
+
+    if(max-min > 50 ){
+      m_looperCandidate = true;
+    }
+  }
+  //Check looperCandidate
 }
 
 uint32_t Cone::getObservations(){
@@ -105,6 +134,10 @@ uint32_t Cone::getObservations(){
 
 Eigen::Vector2d Cone::getLocalConeObservation(int i){
 
+  return m_localObserved[i];
+}
+Eigen::Vector2d Cone::getGlobalConeObservation(int i){
+
   return m_observed[i];
 }
 
@@ -112,39 +145,61 @@ void Cone::calculateMean(){
   uint32_t observations = m_observed.size();
   double x = 0;
   double y = 0;
-  for(uint32_t i = 0; i < observations; i++){
-    x += m_observed[i](0);
-    y += m_observed[i](1);
+  if(observations > 1){
+    for(uint32_t i = 0; i < observations; i++){
+      x += m_observed[i](0);
+      y += m_observed[i](1);
+    }
+    m_meanX = x/observations;
+    m_meanY = y/observations;
   }
-  m_meanX = x/observations;
-  m_meanY = y/observations;
 }
 
 Eigen::Vector2d Cone::getCovariance(){
 
   uint32_t observations = m_observed.size();
-  double varX = 0;
-  double varY = 0;
+  if(observations > 1){
+    double varX = 0;
+    double varY = 0;
 
-  for(uint32_t i = 0; i < observations; i++){
-    varX += (m_observed[i](0) - m_meanX)*(m_observed[i](0) - m_meanX);
-    varY += (m_observed[i](1) - m_meanY)*(m_observed[i](1) - m_meanY);
-  }  
-  varX = varX/observations;
-  varY = varY/observations;
-  
-  Eigen::Vector2d covVec;
-  covVec << varX,varY;
-  return covVec; 
-}
+    for(uint32_t i = 0; i < observations; i++){
+      varX += (m_observed[i](0) - m_meanX)*(m_observed[i](0) - m_meanX);
+      varY += (m_observed[i](1) - m_meanY)*(m_observed[i](1) - m_meanY);
+    }  
+    varX = varX/observations;
+    varY = varY/observations;
+    Eigen::Vector2d covVec;
+    covVec << varX,varY;
+    return covVec; 
+  }else{
 
-void Cone::addConnectedPoseId(int i){
-
-  m_connectedPoses.push_back(i);
-
+    Eigen::Vector2d covVec;
+    covVec << 0.5,0.5;
+    return covVec;
+  }
 }
 
 std::vector<int> Cone::getConnectedPoses(){
 
   return m_connectedPoses;
+}
+
+void Cone::setOptimized(){
+  m_optimizedState = true;
+}
+
+bool Cone::isOptimized(){
+
+  return m_optimizedState;
+}
+bool Cone::getLoopClosingState(){
+  return m_looperCandidate;
+}
+void Cone::setValidState(bool state){
+
+  m_validState = state;
+}
+
+bool Cone::isValid(){
+  return m_validState;
 }

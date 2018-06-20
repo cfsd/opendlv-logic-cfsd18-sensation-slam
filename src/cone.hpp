@@ -33,8 +33,10 @@ class Cone{
     
     opendlv::logic::perception::ObjectDirection getDirection(Eigen::Vector3d pose);
     opendlv::logic::perception::ObjectDistance getDistance(Eigen::Vector3d pose);
-    
-    
+    double getOptX();
+    double getOptY();
+    void setOptX(double x);
+    void setOptY(double y);
     double getMeanX();
     double getMeanY();
     double getX();
@@ -46,15 +48,19 @@ class Cone{
     void setMeanY(double y);
     void setType(int type);
     void setId(int id);
-    void addObservation(Eigen::Vector3d observation);
+    void addObservation(Eigen::Vector3d localObservation,Eigen::Vector3d globalObservation,int i,int currConeId);
     Eigen::Vector2d getLocalConeObservation(int i);
+    Eigen::Vector2d getGlobalConeObservation(int i);
     uint32_t getObservations();
+    
     void calculateMean();
     Eigen::Vector2d getCovariance();
-    void addConnectedPoseId(int i);
     std::vector<int> getConnectedPoses();
-
-
+    void setOptimized();
+    bool isOptimized();
+    bool getLoopClosingState();
+    void setValidState(bool state);
+    bool isValid();
 
   private:
     double m_x;
@@ -63,10 +69,15 @@ class Cone{
     int m_id;
     const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;
     std::vector<Eigen::Vector2d> m_observed = {};
+    std::vector<Eigen::Vector2d> m_localObserved = {};
     double m_meanX = 0;
     double m_meanY = 0;
     std::vector<int> m_connectedPoses = {};
-
+    bool m_optimizedState = false;
+    bool m_looperCandidate = false;
+    double m_optX = 0;
+    double m_optY = 0;
+    bool m_validState = true;
 };
 
 #endif
