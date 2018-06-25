@@ -55,14 +55,16 @@ public:
   void nextPose(cluon::data::Envelope data);
   void nextSplitPose(cluon::data::Envelope data);
   void nextYawRate(cluon::data::Envelope data);
+  void nextGroundSpeed(cluon::data::Envelope data);
   std::vector<Cone> drawCones();
   std::vector<Cone> drawRawCones();
   std::vector<Cone> drawLocalOptimizedCones();
+  bool getModuleState();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
   std::vector<std::vector<int>> drawGraph();
   void recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
-  
+  void initializeModule();
 
  private:
   void setUp(std::map<std::string, std::string> commandlineArguments);
@@ -110,6 +112,7 @@ public:
   std::mutex m_mapMutex;
   std::mutex m_optimizerMutex;
   std::mutex m_yawMutex;
+  std::mutex m_groundSpeedMutex;
   Eigen::Vector3d m_odometryData;
   std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
@@ -133,11 +136,14 @@ public:
   std::mutex m_sendMutex;
   uint32_t m_senderStamp = 0;
   float m_yawRate = 0.0f;
+  float m_groundSpeed = 0.0f;
   cluon::data::TimeStamp m_yawReceivedTime = {};
+  cluon::data::TimeStamp m_groundSpeedReceivedTime = {};
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
   std::vector<Cone> m_coneList = {};
   bool m_filterMap = false;
   bool m_localization;
+  bool m_readyState = false;
   
 
     // Constants for degree transformation

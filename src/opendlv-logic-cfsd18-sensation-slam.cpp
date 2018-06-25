@@ -69,6 +69,7 @@ int32_t main(int32_t argc, char **argv) {
     Collector collector(slam,gatheringTimeMs,2);
     uint32_t detectconeStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["detectConeId"]));
     uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["estimationId"]));
+    uint32_t slamStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["id"]));
 
 
     auto poseEnvelope{[&slammer = slam,senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
@@ -103,10 +104,19 @@ int32_t main(int32_t argc, char **argv) {
         }
       }
     };
+
+    auto groundSpeedEnvelope{[&slammer = slam, senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
+      {
+        if(envelope.senderStamp() == senderStamp){
+          slammer.nextGroundSpeed(envelope);
+        }
+      }
+    };
     od4.dataTrigger(opendlv::proxy::GeodeticWgs84Reading::ID(),splitPoseEnvelope);
     od4.dataTrigger(opendlv::proxy::GeodeticHeadingReading::ID(),splitPoseEnvelope);
     od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(),poseEnvelope);
     od4.dataTrigger(opendlv::proxy::AngularVelocityReading::ID(),yawRateEnvelope);
+    od4.dataTrigger(opendlv::proxy::GroundSpeedReading::ID(),groundSpeedEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectDirection::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectDistance::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectType::ID(),coneEnvelope);
@@ -114,8 +124,19 @@ int32_t main(int32_t argc, char **argv) {
 
     // Just sleep as this microservice is data driven.
     using namespace std::literals::chrono_literals;
+    bool readyState = false;
     while (od4.isRunning()) {
-      std::this_thread::sleep_for(1s);
+
+      if(readyState){
+        opendlv::system::SignalStatusMessage ssm;
+        ssm.code(1);
+        cluon::data::TimeStamp sampleTime = cluon::time::now();
+        od4.send(ssm, sampleTime ,slamStamp);
+      }else{
+        slam.initializeModule();
+        readyState = slam.getModuleState();
+      }
+      std::this_thread::sleep_for(0.1s);
       std::chrono::system_clock::time_point tp;
     }
   }

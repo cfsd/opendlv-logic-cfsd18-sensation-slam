@@ -33,6 +33,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_mapMutex()
 , m_optimizerMutex()
 , m_yawMutex()
+, m_groundSpeedMutex()
 , m_odometryData()
 , m_gpsReference()
 , m_map()
@@ -128,8 +129,16 @@ void Slam::nextYawRate(cluon::data::Envelope data){
 
   std::lock_guard<std::mutex> lockYaw(m_yawMutex);
   auto yawRate = cluon::extractMessage<opendlv::proxy::AngularVelocityReading>(std::move(data));
-  m_yawRate = yawRate.angularVelocityZ()/1;
+  m_yawRate = yawRate.angularVelocityZ();
    m_yawReceivedTime = data.sampleTimeStamp();
+   //std::cout << "Yaw in message: " << m_yawRate << std::endl;
+}
+void Slam::nextGroundSpeed(cluon::data::Envelope data){
+
+  std::lock_guard<std::mutex> lockGroundSpeed(m_groundSpeedMutex);
+  auto groundSpeed = cluon::extractMessage<opendlv::proxy::GroundSpeedReading>(std::move(data));
+  m_groundSpeed = groundSpeed.groundSpeed();
+   m_groundSpeedReceivedTime = data.sampleTimeStamp();
    //std::cout << "Yaw in message: " << m_yawRate << std::endl;
 }
 
@@ -169,7 +178,7 @@ bool Slam::isKeyframe(){
 
 void Slam::performSLAM(Eigen::MatrixXd cones){
   
-  if(fabs(m_odometryData(0))>200 || fabs(m_odometryData(1))>200)
+  if(!m_readyState)
   {
     return;
   }
@@ -922,16 +931,86 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
   m_localization = static_cast<bool>(std::stoi(configuration["localization"]));
-  //auto kv = getKeyValueConfiguration();
-  //m_timeDiffMilliseconds = kv.getValue<double>("logic-cfsd18-perception-detectcone.timeDiffMilliseconds");
-  //m_newConeThreshold = kv.getValue<double>("logic-cfsd18-sensation-slam.newConeLimit");
 
-  //double const latitude = getKeyValueConfiguration().getValue<double>("logic-sensation-geolocator.GPSreference.latitude");
-  //double const longitude = getKeyValueConfiguration().getValue<double>("logic-sensation-geolocator.GPSreference.longitude");
-  //m_gpsReference = opendlv::data::environment::WGS84Coordinate(latitude,longitude);
-  
+
 }
+void Slam::initializeModule(){
+  //local Gps Vars
+  double lastOdoX = 100000;
+  double lastOdoY = 100000;
+  int validGpsMeasurements = 0;
+  bool gpsReadyState = false;
 
+  //Local IMU vars
+  bool imuReadyState = false;
+  float lastVel = 100000;
+  float lastHead = 100000;
+  int validVelMeasurements = 0;
+  int validHeadMeasurements = 0;
+  while(!m_readyState){
+    bool sleep = true;
+    auto start = std::chrono::system_clock::now();
+
+    while(sleep)
+    {
+      auto now = std::chrono::system_clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - start);
+
+      if(elapsed.count() > 50*1000){
+        //std::cout << "Timed out" << std::endl;
+        sleep = false;
+      }
+    }
+    //GPS
+
+    std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+    if(!gpsReadyState){
+
+      if( std::fabs(m_odometryData(0) - lastOdoX) > 0.001 && std::fabs(m_odometryData(1) - lastOdoY) > 0.001){
+        if(m_odometryData(0) < 1000 && m_odometryData(1) < 1000){
+          lastOdoX = m_odometryData(0);
+          lastOdoY = m_odometryData(1);
+          validGpsMeasurements++;
+        }
+      }else{}
+
+      if(validGpsMeasurements > 30){
+        gpsReadyState = true;
+        std::cout << "GPS Ready .." << std::endl;
+      }
+    }//GPS end  
+    //IMU
+    if(!imuReadyState){
+
+      std::lock_guard<std::mutex> lockGroundSpeed(m_groundSpeedMutex);
+      if(std::fabs(m_groundSpeed - lastVel) > 0.001){ 
+        lastVel = m_groundSpeed;  
+        validVelMeasurements++;
+      }
+      if(std::fabs(m_odometryData(2) - lastHead) > 0.001){
+        lastHead = static_cast<float>(m_odometryData(2));  
+        validHeadMeasurements++;
+      }
+      if(validVelMeasurements > 30 && validHeadMeasurements > 30){
+        imuReadyState = true;
+        std::cout << "IMU Ready .." << std::endl;
+      }
+    }
+
+    if(gpsReadyState && imuReadyState){
+      m_readyState = true;
+      std::cout << "Slam ready check done !" << std::endl;  
+    }
+  }//While
+  
+  
+
+}
+bool Slam::getModuleState(){
+
+  return m_readyState;
+
+}
 std::vector<Eigen::Vector3d> Slam::drawPoses(){
   std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
   return m_poses;
