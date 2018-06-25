@@ -74,7 +74,7 @@ public:
   Eigen::Vector3d updatePoseFromGraph();
   void addPosesToGraph();
   void performSLAM(Eigen::MatrixXd Cones);
-  void localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptimization);
+  void localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void createFullGraph();
   void optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
@@ -136,6 +136,7 @@ public:
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
   std::vector<Cone> m_coneList = {};
   bool m_filterMap = false;
+  bool m_localization;
   
 
     // Constants for degree transformation

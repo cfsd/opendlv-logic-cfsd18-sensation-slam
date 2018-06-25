@@ -40,6 +40,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_newFrame()
 , m_sendPose()
 , m_sendMutex()
+, m_localization()
 {
   setupOptimizer();
   setUp(commandlineArguments);
@@ -236,7 +237,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     if(m_loopClosingComplete){
 
       
-      localizer(cones, pose, false); //False or True for pose optimization
+      localizer(cones, pose); //False or True for pose optimization
 
       sendPose();
       sendCones();
@@ -244,7 +245,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 
 }
 
-void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptimization){
+void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
   g2o::SparseOptimizer localGraph;
   typedef g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1> > slamBlockSolver;
@@ -290,7 +291,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose, bool poseOptim
 
   }
 
-  if(matchedConeIndex.size() > 0 && poseOptimization){  
+  if(matchedConeIndex.size() > 0 && m_localization){  
     //Create graph
     //Add pose vertex
     g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
@@ -904,6 +905,7 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   m_conesPerPacket = static_cast<int>(std::stoi(configuration["conesPerPacket"]));
   std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
+  m_localization = static_cast<bool>(std::stoi(configuration["localization"]));
   //auto kv = getKeyValueConfiguration();
   //m_timeDiffMilliseconds = kv.getValue<double>("logic-cfsd18-perception-detectcone.timeDiffMilliseconds");
   //m_newConeThreshold = kv.getValue<double>("logic-cfsd18-sensation-slam.newConeLimit");

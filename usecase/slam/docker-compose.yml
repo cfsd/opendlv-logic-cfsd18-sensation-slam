@@ -11,7 +11,7 @@ services:
         image: "slam:test"
         network_mode: "host"
         ipc: host
-        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=112 --gatheringTimeMs=20 --sameConeThreshold=1.5 --refLatitude=57.714051 --refLongitude=11.948666 --timeBetweenKeyframes=150 --coneMappingThreshold=7 --conesPerPacket=20 --localization=0"
+        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=112 --gatheringTimeMs=20 --sameConeThreshold=1.5 --refLatitude=57.714051 --refLongitude=11.948666 --timeBetweenKeyframes=150 --coneMappingThreshold=7 --conesPerPacket=20 --localization=1"
 #    odcockpit:
 #        image: ${IMAGE}
 #        network_mode: host
