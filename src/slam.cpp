@@ -231,6 +231,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       filterMap();
       updateMap(0,m_coneList.size(),true);
       m_filterMap = false;
+      m_currentConeIndex = 0;
     }
 
     //Localizer
@@ -243,6 +244,19 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       sendCones();
     }
 
+}
+
+int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex){
+  currentConeIndex=(currentConeIndex<m_map.size())?(currentConeIndex):(currentConeIndex-m_map.size());
+  Cone currentCone = m_map[currentConeIndex];
+  auto distance = currentCone.getDistance(pose);
+  auto direction = currentCone.getDirection(pose);
+  std::cout << "hej" << std::endl;
+  if(distance.distance() < 10.0f && fabs(direction.azimuthAngle())>80.0f){
+    currentConeIndex++;
+    currentConeIndex = updateCurrentCone(pose,currentConeIndex);
+  }
+  return currentConeIndex;
 }
 
 void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
@@ -262,7 +276,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   //Find match in conelist
   std::vector<int> matchedConeIndex;
   std::vector<Eigen::Vector3d> localObs;
-  double shortestDistance = 10000;
+  //double shortestDistance = 10000;
   for(uint32_t i = 0; i < cones.cols(); i++){
     bool foundMatch = false;
     uint32_t j = 0;
@@ -277,19 +291,23 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
         Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
         localObs.push_back(localCone);
         foundMatch = true;
-
+/*
         if(distance < shortestDistance){
 
           shortestDistance = distance;
-          m_currentConeIndex = m_map[j].getId();
+          //m_currentConeIndex = m_map[j].getId();
 
         }
+        */
       }
 
       j++;
     }
 
   }
+  std::cout << "Current Cone is (before): " << m_currentConeIndex << std::endl;
+  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex);
+  std::cout << "Current Cone is (after): " << m_currentConeIndex << std::endl;
 
   if(matchedConeIndex.size() > 0 && m_localization){  
     //Create graph
@@ -761,17 +779,17 @@ void Slam::sendCones()
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
   //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
   cluon::data::TimeStamp sampleTime = m_lastTimeStamp;
-  for(uint32_t i = 0; i< m_conesPerPacket+4;i++){ //Iterate through the cones ahead of time the path planning recieves
-    int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i-4):(m_currentConeIndex+i-m_map.size()-4); //Check if more cones is sent than there exists
+  for(uint32_t i = 0; i< m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
+    int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
     directionMsg.objectId(m_conesPerPacket-1-i);
     od4.send(directionMsg,sampleTime,m_senderStamp);
     opendlv::logic::perception::ObjectDistance distanceMsg = m_map[index].getDistance(pose); //Extract cone distance
-    distanceMsg.objectId(m_conesPerPacket-i-1);
+    distanceMsg.objectId(m_conesPerPacket-1-i);
     od4.send(distanceMsg,sampleTime,m_senderStamp);
     opendlv::logic::perception::ObjectType typeMsg;
     typeMsg.type(m_map[index].getType()); //Extract cone type
-    typeMsg.objectId(m_conesPerPacket-i-1);
+    typeMsg.objectId(m_conesPerPacket-1-i);
     od4.send(typeMsg,sampleTime,m_senderStamp);
   }
 }
@@ -809,11 +827,9 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
     if(updateToGlobal && m_coneList[i].isValid()){
       m_map.push_back(m_coneList[i]);
     }else{
-
       m_essentialMap.push_back(m_coneList[i]);
     }
   }
-
 }
 
 void Slam::filterMap(){
