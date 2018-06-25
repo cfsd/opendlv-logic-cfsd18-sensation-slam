@@ -51,45 +51,50 @@ private:
  typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 public:
   Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Session &a_od4);
-  ~Slam() = default;
-  void nextCone(cluon::data::Envelope data);
+  ~Slam();
   void nextPose(cluon::data::Envelope data);
   void nextSplitPose(cluon::data::Envelope data);
   void nextYawRate(cluon::data::Envelope data);
   std::vector<Cone> drawCones();
+  std::vector<Cone> drawRawCones();
+  std::vector<Cone> drawLocalOptimizedCones();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
   std::vector<std::vector<int>> drawGraph();
+  void recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
   
 
  private:
   void setUp(std::map<std::string, std::string> commandlineArguments);
   void setupOptimizer();
   void tearDown();
-  bool CheckContainer(uint32_t objectId, cluon::data::TimeStamp timeStamp);
   bool isKeyframe();
-  void addOdometryMeasurement(Eigen::Vector3d pose);
-  void optimizeGraph();
-  void localizer(Eigen::Vector3d pose, Eigen::MatrixXd cones);
+  void addOdometryMeasurement(Eigen::Vector3d pose,uint32_t i);
+  void fullBA();
   Eigen::Vector3d updatePoseFromGraph();
-  Eigen::Vector3d updatePose(Eigen::Vector3d pose, Eigen::Vector2d errorDistance);
-  void addPoseToGraph(Eigen::Vector3d pose);
+  void addPosesToGraph();
   void performSLAM(Eigen::MatrixXd Cones);
-  Eigen::MatrixXd conesToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cones);
+  void localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  void createFullGraph();
+  void optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
+  void updateFromEssential(uint32_t poseStart, uint32_t poseEnd,uint32_t coneStart,uint32_t coneEnd, g2o::SparseOptimizer &essentialGraph);
   Eigen::Vector3d coneToGlobal(Eigen::Vector3d pose, Eigen::MatrixXd Cone);
+  int updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex);
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
-  void addConesToMap(Eigen::MatrixXd cones, Eigen::Vector3d pose);
-  void addConeMeasurement(Cone cone, Eigen::Vector3d measurement);
-  void addConeToGraph(Cone cone, Eigen::Vector3d measurement);
-  void initializeCollection();
-  bool loopClosing(Cone cone,double distance2car);
+  void addConeMeasurements(int i);
+  Eigen::Vector2d getConeToPoseMeasurement(int i, int j);
+  Eigen::Vector2d getLocalConeToPoseMeasurement(Eigen::Vector3d pose, Eigen::Vector2d cone);
+  void addConesToGraph();
   double distanceBetweenCones(Cone c1, Cone c2);
-  void updateMap();
+  double distanceBetweenConesOpt(Cone c1, Cone c2);
+  void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
+  void filterMap();
   void sendCones();
   void sendPose();
-  //bool newCone(Eigen::MatrixXd cone,int poseId);
+  void writeToPoseAndMapFile();
 
 
 
@@ -108,6 +113,7 @@ public:
   Eigen::Vector3d m_odometryData;
   std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
+  std::vector<Cone> m_essentialMap = {};
   std::vector<Eigen::Vector3d> m_poses = {};
   std::vector<std::vector<int>> m_connectivityGraph = {};
   double m_newConeThreshold= 1;
@@ -116,6 +122,7 @@ public:
   double m_coneMappingThreshold = 67;
   uint32_t m_currentConeIndex = 0;
   int m_poseId = 1000;
+  int m_coneRef = 0;
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
@@ -128,6 +135,9 @@ public:
   float m_yawRate = 0.0f;
   cluon::data::TimeStamp m_yawReceivedTime = {};
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
+  std::vector<Cone> m_coneList = {};
+  bool m_filterMap = false;
+  bool m_localization;
   
 
     // Constants for degree transformation
