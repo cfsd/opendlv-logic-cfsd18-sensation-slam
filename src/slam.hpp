@@ -59,6 +59,7 @@ public:
   std::vector<Cone> drawCones();
   std::vector<Cone> drawRawCones();
   std::vector<Cone> drawLocalOptimizedCones();
+  void setStateMachineStatus(cluon::data::Envelope data);
   bool getModuleState();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
@@ -113,6 +114,7 @@ public:
   std::mutex m_optimizerMutex;
   std::mutex m_yawMutex;
   std::mutex m_groundSpeedMutex;
+  std::mutex m_stateMachineMutex;
   Eigen::Vector3d m_odometryData;
   std::array<double,2> m_gpsReference;
   std::vector<Cone> m_map;
@@ -144,6 +146,7 @@ public:
   bool m_filterMap = false;
   bool m_localization;
   bool m_readyState = false;
+  bool m_readyStateMachine = true;
   
 
     // Constants for degree transformation

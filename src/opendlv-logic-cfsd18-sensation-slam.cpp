@@ -69,8 +69,8 @@ int32_t main(int32_t argc, char **argv) {
     Collector collector(slam,gatheringTimeMs,2);
     uint32_t detectconeStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["detectConeId"]));
     uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["estimationId"]));
-    uint32_t slamStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["id"]));
-
+    uint32_t slamStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["id"])); 
+    uint32_t stateMachineStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["stateMachineId"]));
 
     auto poseEnvelope{[&slammer = slam,senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
       {
@@ -112,6 +112,16 @@ int32_t main(int32_t argc, char **argv) {
         }
       }
     };
+
+
+    auto stateMachineStatusEnvelope{[&slammer = slam, senderStamp = stateMachineStamp](cluon::data::Envelope &&envelope)
+      {
+        if(envelope.senderStamp() == senderStamp){
+          
+          slammer.setStateMachineStatus(envelope);
+        }
+      }
+    };
     od4.dataTrigger(opendlv::proxy::GeodeticWgs84Reading::ID(),splitPoseEnvelope);
     od4.dataTrigger(opendlv::proxy::GeodeticHeadingReading::ID(),splitPoseEnvelope);
     od4.dataTrigger(opendlv::logic::sensation::Geolocation::ID(),poseEnvelope);
@@ -120,6 +130,7 @@ int32_t main(int32_t argc, char **argv) {
     od4.dataTrigger(opendlv::logic::perception::ObjectDirection::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectDistance::ID(),coneEnvelope);
     od4.dataTrigger(opendlv::logic::perception::ObjectType::ID(),coneEnvelope);
+    od4.dataTrigger(opendlv::proxy::SwitchStateReading::ID(),stateMachineStatusEnvelope);
     
 
     // Just sleep as this microservice is data driven.

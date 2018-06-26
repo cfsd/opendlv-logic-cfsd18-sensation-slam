@@ -34,6 +34,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_optimizerMutex()
 , m_yawMutex()
 , m_groundSpeedMutex()
+, m_stateMachineMutex()
 , m_odometryData()
 , m_gpsReference()
 , m_map()
@@ -178,7 +179,8 @@ bool Slam::isKeyframe(){
 
 void Slam::performSLAM(Eigen::MatrixXd cones){
   
-  if(!m_readyState)
+  std::lock_guard<std::mutex> lockStateMachine(m_stateMachineMutex);
+  if(!m_readyStateMachine)
   {
     return;
   }
@@ -1005,6 +1007,15 @@ void Slam::initializeModule(){
   
   
 
+}
+void Slam::setStateMachineStatus(cluon::data::Envelope data){
+  std::lock_guard<std::mutex> lockStateMachine(m_stateMachineMutex);
+  auto machineStatus = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(data));
+  int state = machineStatus.state();
+  if(state == 2){
+    m_readyStateMachine = true;
+  }
+  
 }
 bool Slam::getModuleState(){
 
