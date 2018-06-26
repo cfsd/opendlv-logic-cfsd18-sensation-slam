@@ -123,7 +123,7 @@ void Slam::nextPose(cluon::data::Envelope data){
   m_odometryData << WGS84Reading[0],
                     WGS84Reading[1],
                     odometry.heading();
-  std::cout << "head: " << odometry.heading() << std::endl;                   
+  //std::cout << "head: " << odometry.heading() << std::endl;                   
 }
 
 void Slam::nextYawRate(cluon::data::Envelope data){
@@ -262,7 +262,7 @@ int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex){
   Cone currentCone = m_map[currentConeIndex];
   auto distance = currentCone.getDistance(pose);
   auto direction = currentCone.getDirection(pose);
-  std::cout << "hej" << std::endl;
+  //std::cout << "hej" << std::endl;
   if(distance.distance() < 10.0f && fabs(direction.azimuthAngle())>80.0f){
     currentConeIndex++;
     currentConeIndex = updateCurrentCone(pose,currentConeIndex);
@@ -316,9 +316,9 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     }
 
   }
-  std::cout << "Current Cone is (before): " << m_currentConeIndex << std::endl;
+  //std::cout << "Current Cone is (before): " << m_currentConeIndex << std::endl;
   m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex);
-  std::cout << "Current Cone is (after): " << m_currentConeIndex << std::endl;
+  //std::cout << "Current Cone is (after): " << m_currentConeIndex << std::endl;
 
   if(matchedConeIndex.size() > 0 && m_localization){  
     //Create graph
@@ -360,10 +360,10 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
     /*g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(localGraph.vertex(0));
     firstCone->setFixed(true);*/
-    std::cout << "Optimizing" << std::endl;
+    //std::cout << "Optimizing" << std::endl;
     localGraph.initializeOptimization();
     localGraph.optimize(10); //Add config for amount of iterations??
-    std::cout << "Optimizing done." << std::endl;
+    //std::cout << "Optimizing done." << std::endl;
 
 
 
@@ -376,7 +376,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     {
       std::lock_guard<std::mutex> lockSend(m_sendMutex); 
       m_sendPose << updatedPose(0),updatedPose(1),updatedPose(2);
-      std::cout << "pose: " << updatedPose(0) << " : " << updatedPose(1) << " : " << updatedPose(2) << std::endl;
+      //std::cout << "pose: " << updatedPose(0) << " : " << updatedPose(1) << " : " << updatedPose(2) << std::endl;
     }
 
   }else{
@@ -426,7 +426,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       j++;
     }
     if(distanceToCar < m_coneMappingThreshold && !coneFound && !m_loopClosing && !firstCone){
-      std::cout << "Trying to add cone" << std::endl;
+      //std::cout << "Trying to add cone" << std::endl;
       Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
       cone.addObservation(localCone, globalCone,m_poseId,m_currentConeIndex);
       m_coneList.push_back(cone);
@@ -527,7 +527,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
       for(uint32_t j = 0; j < connectedPoses.size(); j++){
           Eigen::Vector2d xyMeasurement;
           xyMeasurement = getConeToPoseMeasurement(i,j);
-          std::cout << "x: " << xyMeasurement(0) << " y: " << xyMeasurement(1) << std::endl; 
+          //std::cout << "x: " << xyMeasurement(0) << " y: " << xyMeasurement(1) << std::endl; 
           coneMeasurement->vertices()[0] = essentialGraph.vertex(connectedPoses[j]);
           coneMeasurement->vertices()[1] = essentialGraph.vertex(m_coneList[i].getId());
           coneMeasurement->setMeasurement(xyMeasurement);
@@ -537,7 +537,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
           informationMatrix << 1/covXY(0),0,
                               0,1/covXY(1);
           coneMeasurement->setInformation(informationMatrix); //Placeholder value
-          std::cout << "cX: " << covXY(0) << " cY: " << covXY(1) << std::endl;
+          //std::cout << "cX: " << covXY(0) << " cY: " << covXY(1) << std::endl;
           essentialGraph.addEdge(coneMeasurement);
 
         }
@@ -549,10 +549,10 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
 
     /*g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(essentialGraph.vertex(graphIndexStart));
     firstCone->setFixed(true);*/
-    std::cout << "Optimizing" << std::endl;
+    //std::cout << "Optimizing" << std::endl;
     essentialGraph.initializeOptimization();
     essentialGraph.optimize(10); //Add config for amount of iterations??
-    std::cout << "Optimizing done." << std::endl;
+    //std::cout << "Optimizing done." << std::endl;
 
     updateFromEssential(min, max, graphIndexStart,graphIndexEnd, essentialGraph);
     updateMap(graphIndexStart,graphIndexEnd,false);
@@ -643,10 +643,10 @@ void Slam::fullBA(){
 
   //m_optimizer.setVerbose(true);
 
-  std::cout << "Optimizing" << std::endl;
+  //std::cout << "Optimizing" << std::endl;
   m_optimizer.initializeOptimization();
   m_optimizer.optimize(10); //Add config for amount of iterations??
-  std::cout << "Optimizing done." << std::endl;
+  //std::cout << "Optimizing done." << std::endl;
 
 
   Eigen::Vector2d updatedConeXY;
@@ -907,10 +907,10 @@ void Slam::filterMap(){
 
         m_coneList[i].setType(1);
 
-        std::cout << "New type yellow" << std::endl;
+        //std::cout << "New type yellow" << std::endl;
       }else if(azimuth < -0.1){
         m_coneList[i].setType(2);
-        std::cout << "New type blue" << std::endl;
+        //std::cout << "New type blue" << std::endl;
       }
     }
 
@@ -930,7 +930,7 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   m_timeBetweenKeyframes = static_cast<double>(std::stod(configuration["timeBetweenKeyframes"]));
   m_coneMappingThreshold = static_cast<double>(std::stod(configuration["coneMappingThreshold"]));
   m_conesPerPacket = static_cast<int>(std::stoi(configuration["conesPerPacket"]));
-  std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
+  //std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
   m_localization = static_cast<bool>(std::stoi(configuration["localization"]));
 
