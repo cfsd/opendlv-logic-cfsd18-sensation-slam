@@ -146,7 +146,7 @@ public:
   bool m_filterMap = false;
   bool m_localization;
   bool m_readyState = false;
-  bool m_readyStateMachine = true;
+  bool m_readyStateMachine = false;
   
 
     // Constants for degree transformation
