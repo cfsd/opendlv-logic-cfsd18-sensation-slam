@@ -180,7 +180,7 @@ bool Slam::isKeyframe(){
 void Slam::performSLAM(Eigen::MatrixXd cones){
   
   std::lock_guard<std::mutex> lockStateMachine(m_stateMachineMutex);
-  if(!m_readyStateMachine)
+  if(!m_readyStateMachine || !m_readyState)
   {
     return;
   }
@@ -257,15 +257,18 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 
 }
 
-int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex){
+int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex, uint32_t remainingIter){
   currentConeIndex=(currentConeIndex<m_map.size())?(currentConeIndex):(currentConeIndex-m_map.size());
   Cone currentCone = m_map[currentConeIndex];
+  remainingIter = remainingIter-1;
   auto distance = currentCone.getDistance(pose);
   auto direction = currentCone.getDirection(pose);
   //std::cout << "hej" << std::endl;
+  if(remainingIter == 0){
+    return currentConeIndex-1;
+  }
   if(distance.distance() < 10.0f && fabs(direction.azimuthAngle())>80.0f){
-    currentConeIndex++;
-    currentConeIndex = updateCurrentCone(pose,currentConeIndex);
+    currentConeIndex = updateCurrentCone(pose,currentConeIndex+1,remainingIter);
   }
   return currentConeIndex;
 }
@@ -317,7 +320,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
   }
   //std::cout << "Current Cone is (before): " << m_currentConeIndex << std::endl;
-  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex);
+  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size());
   //std::cout << "Current Cone is (after): " << m_currentConeIndex << std::endl;
 
   if(matchedConeIndex.size() > 0 && m_localization){  
@@ -831,7 +834,29 @@ double Slam::distanceBetweenConesOpt(Cone c1, Cone c2){
   double distance = std::sqrt( (c1.getOptX()-c2.getMeanX())*(c1.getOptX()-c2.getMeanX()) + (c1.getOptY()-c2.getMeanY())*(c1.getOptY()-c2.getMeanY()) );
   return distance;
 }
-
+/*
+void Slam::guessConeColor(){
+  std::vector<Cone> colorMap;
+  uint32_t currentConeIndex = 0;
+  for(uint32_t i = 0; i<m_poses.size(); i++){
+    Eigen::Vector3d pose = m_poses[i];
+    currentConeIndex = updateCurrentCone(pose,currentConeIndex,5);
+    Cone currentCone = m_map[currentConeIndex];
+    auto distance = currentCone.getDistance(pose);
+    auto direction = currentCone.getDirection(pose);
+    if(distance.distance() < 10.0f && fabs(direction.azimuthAngle())>80.0f){
+      if(direction.azimuthAngle()>0){
+        currentCone.setType(2);
+      }
+      else{
+        currentCone.setType(1);
+      }
+      colorMap.push_back(currentCone);
+      }
+    }
+    m_map = colorMap;
+}
+*/
 void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
   for(uint32_t i = start; i < end; i++){
 
@@ -855,39 +880,48 @@ void Slam::filterMap(){
   }
 
   for(uint32_t i = 0; i < m_coneList.size(); i++){
+    for(uint32_t j = 0; j < m_coneList.size(); j++){
+      if(i != j){
+        double distance = std::sqrt( (m_coneList[i].getOptX() - m_coneList[j].getOptX() )*(m_coneList[i].getOptX() - m_coneList[j].getOptX()) + (m_coneList[i].getOptY() - m_coneList[j].getOptY())*(m_coneList[i].getOptY() - m_coneList[j].getOptY()) );
 
-      for(uint32_t j = 0; j < m_coneList.size(); j++){
-        if(i != j){
-          double distance = std::sqrt( (m_coneList[i].getOptX() - m_coneList[j].getOptX() )*(m_coneList[i].getOptX() - m_coneList[j].getOptX()) + (m_coneList[i].getOptY() - m_coneList[j].getOptY())*(m_coneList[i].getOptY() - m_coneList[j].getOptY()) );
-
-          if(distance < m_newConeThreshold && m_coneList[i].isValid() && m_coneList[j].isValid()){
-            m_coneList[j].setValidState(false);
-          }
-        } 
-      }
+        if(distance < m_newConeThreshold && m_coneList[i].isValid() && m_coneList[j].isValid()){
+          m_coneList[j].setValidState(false);
+        }
+      } 
+    }
   }  
 
 
   //Check closest pose didstance
   for(uint32_t i = 0; i < m_coneList.size(); i++){
-    
     double closestPoseDistance = 10000;
+    uint32_t closestPoseId = 0;
     for(uint32_t j = 0; j < m_poses.size(); j++){
-
       double distance = std::sqrt( (m_poses[j](0)-m_coneList[i].getOptX())*(m_poses[j](0)-m_coneList[i].getOptX()) + (m_poses[j](1)-m_coneList[i].getOptY())*(m_poses[j](1)-m_coneList[i].getOptY()) );
       if(distance < closestPoseDistance){
         closestPoseDistance = distance;
+        closestPoseId = j;
       }
 
     }
-
     if(closestPoseDistance > 3){
       m_coneList[i].setValidState(false);
     }
+    else{
+      auto direction = m_coneList[i].getDirection(m_poses[closestPoseId]);
+      if(direction.azimuthAngle()>0){
+        m_coneList[i].setType(1);
+      }
+      else{
+        m_coneList[i].setType(2);
+      }
+      
+    }
+
   }
 
   //Check colours
-
+/*
   for(uint32_t i = 0; i < m_coneList.size(); i++){
     double distance = 10000;
     double azimuth = 1000;
@@ -912,10 +946,10 @@ void Slam::filterMap(){
         m_coneList[i].setType(2);
         //std::cout << "New type blue" << std::endl;
       }
-    }
+    }*/
 
 
-  }
+  //}
 
 
 }
@@ -969,14 +1003,14 @@ void Slam::initializeModule(){
     if(!gpsReadyState){
 
       if( std::fabs(m_odometryData(0) - lastOdoX) > 0.001 && std::fabs(m_odometryData(1) - lastOdoY) > 0.001){
-        if(m_odometryData(0) < 1000 && m_odometryData(1) < 1000){
+        if(m_odometryData(0) < 200 && m_odometryData(1) < 200){
           lastOdoX = m_odometryData(0);
           lastOdoY = m_odometryData(1);
           validGpsMeasurements++;
         }
       }else{}
 
-      if(validGpsMeasurements > 30){
+      if(validGpsMeasurements > 5){
         gpsReadyState = true;
         std::cout << "GPS Ready .." << std::endl;
       }
