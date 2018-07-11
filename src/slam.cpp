@@ -111,17 +111,17 @@ void Slam::nextPose(cluon::data::Envelope data){
 
   //toCartesian(const std::array<double, 2> &WGS84Reference, const std::array<double, 2> &WGS84Position)
 
-  std::array<double,2> WGS84ReadingTemp;
+  //std::array<double,2> WGS84ReadingTemp;
 
-  WGS84ReadingTemp[0] = latitude;
-  WGS84ReadingTemp[1] = longitude;
+  //WGS84ReadingTemp[0] = latitude;
+  //WGS84ReadingTemp[1] = longitude;
 
-  std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
+  //std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
   //opendlv::data::environment::WGS84Coordinate gpsCurrent = opendlv::data::environment::WGS84Coordinate(latitude, longitude);
   //opendlv::data::environment::Point3 gpsTransform = m_gpsReference.transform(gpsCurrent);
 
-  m_odometryData << WGS84Reading[0],
-                    WGS84Reading[1],
+  m_odometryData << longitude,
+                    latitude,
                     odometry.heading();
   //std::cout << "head: " << odometry.heading() << std::endl;                   
 }
@@ -193,7 +193,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     {
       std::lock_guard<std::mutex> lockYaw(m_yawMutex);
       if(timeElapsed > 0 && timeElapsed < 1){
-        pose(2) = pose(2) - static_cast<double>(m_yawRate)*(timeElapsed);
+        pose(2) = pose(2); // - static_cast<double>(m_yawRate)*(timeElapsed);
       }
     }  
     m_poses.push_back(pose);
@@ -375,14 +375,14 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(localGraph.vertex(1000));
     g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
     Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
-  
-    {
-      std::lock_guard<std::mutex> lockSend(m_sendMutex); 
+    double poseDiff = std::sqrt((pose(0)-updatedPose(0))*(pose(0)-updatedPose(0))+(pose(1)-updatedPose(1))*(pose(1)-updatedPose(1)));
+    if(poseDiff<2.0){
+      std::lock_guard<std::mutex> lockSend(m_sendMutex);
       m_sendPose << updatedPose(0),updatedPose(1),updatedPose(2);
       //std::cout << "pose: " << updatedPose(0) << " : " << updatedPose(1) << " : " << updatedPose(2) << std::endl;
     }
-
   }else{
+    std::lock_guard<std::mutex> lockSend(m_sendMutex);
     m_sendPose << pose(0),pose(1),pose(2);
   }
 
