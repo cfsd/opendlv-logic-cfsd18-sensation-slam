@@ -116,13 +116,13 @@ void Cone::addObservation(Eigen::Vector3d localObservation,Eigen::Vector3d globa
   Eigen::Vector2d newGlobalObservation;
   newGlobalObservation << globalObservation(0),globalObservation(1);
   m_observed.push_back(newGlobalObservation);
-
   m_connectedPoses.push_back(i);
+  
   if(!m_looperCandidate && currConeId > 20){
     uint32_t max = *std::max_element(m_connectedPoses.begin(), m_connectedPoses.end());
     uint32_t min = *std::min_element(m_connectedPoses.begin(), m_connectedPoses.end());
 
-    if(max-min > 50 ){
+    if(max-min > 50){
       m_looperCandidate = true;
     }
   }

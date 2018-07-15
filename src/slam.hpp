@@ -126,6 +126,8 @@ public:
   double m_timeBetweenKeyframes = 0.5;
   double m_coneMappingThreshold = 67;
   uint32_t m_currentConeIndex = 0;
+  int m_currentConeDiff = 0;
+  int m_lapSize = 50;
   int m_poseId = 1000;
   int m_coneRef = 0;
   uint32_t m_conesPerPacket = 20;
