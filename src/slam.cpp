@@ -110,20 +110,26 @@ void Slam::nextPose(cluon::data::Envelope data){
   double latitude = odometry.latitude();
 
   //toCartesian(const std::array<double, 2> &WGS84Reference, const std::array<double, 2> &WGS84Position)
+  if(m_gpsCoords){
 
-  //std::array<double,2> WGS84ReadingTemp;
+    std::array<double,2> WGS84ReadingTemp;
 
-  //WGS84ReadingTemp[0] = latitude;
-  //WGS84ReadingTemp[1] = longitude;
+    WGS84ReadingTemp[0] = latitude;
+    WGS84ReadingTemp[1] = longitude;
 
-  //std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
-  //opendlv::data::environment::WGS84Coordinate gpsCurrent = opendlv::data::environment::WGS84Coordinate(latitude, longitude);
-  //opendlv::data::environment::Point3 gpsTransform = m_gpsReference.transform(gpsCurrent);
+    std::array<double,2> WGS84Reading = wgs84::toCartesian(m_gpsReference, WGS84ReadingTemp); 
+    //opendlv::data::environment::WGS84Coordinate gpsCurrent = opendlv::data::environment::WGS84Coordinate(latitude, longitude);
+    //opendlv::data::environment::Point3 gpsTransform = m_gpsReference.transform(gpsCurrent);
 
-  m_odometryData << longitude,
-                    latitude,
-                    odometry.heading();
-  //std::cout << "head: " << odometry.heading() << std::endl;                   
+    m_odometryData << WGS84Reading[0],
+                      WGS84Reading[1],
+                      odometry.heading();
+  }
+  else{
+    m_odometryData << longitude,
+                      latitude,
+                      odometry.heading();
+  }  //std::cout << "head: " << odometry.heading() << std::endl;                   
 }
 
 void Slam::nextYawRate(cluon::data::Envelope data){
@@ -282,7 +288,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     while(!foundMatch && j < m_map.size()){
       Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
       Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
-      double distance = distanceBetweenCones(m_map[j],globalConeObject);
+      double distance = distanceBetweenConesOpt(m_map[j],globalConeObject);
 
       if(distance < m_newConeThreshold){ //m_newConeThreshold
         matchedConeIndex.push_back(j);
@@ -386,8 +392,8 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     uint32_t j = 0;
     bool coneFound = false;
     while(!coneFound && j<m_coneList.size() && !m_loopClosing && !firstCone){
-      if(fabs(m_coneList[j].getType() - cones(3,i))<0.0001){ //Check is same classification
-    
+      if(fabs(m_coneList[j].getType() - cones(3,i))<0.0001 && !std::isnan(globalCone(0)) && !std::isnan(globalCone(1))){ //Check is same classification
+
         Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
         double distance = distanceBetweenCones(m_coneList[j],globalConeObject);
 
@@ -395,7 +401,7 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
           coneFound = true;
           m_coneList[j].addObservation(localCone, globalCone, m_poseId,m_currentConeIndex);
           
-          if(distanceToCar<minDistance){//Update current cone to know where in the map we are
+          if(distanceToCar<minDistance && distanceToCar<m_coneMappingThreshold){//Update current cone to know where in the map we are
             currentConeIndex = j;
             minDistance = distanceToCar;
           }
@@ -405,9 +411,11 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
     }
     if(distanceToCar < m_coneMappingThreshold && !coneFound && !m_loopClosing && !firstCone){
       //std::cout << "Trying to add cone" << std::endl;
-      Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
-      cone.addObservation(localCone, globalCone,m_poseId,m_currentConeIndex);
-      m_coneList.push_back(cone);
+      if(!std::isnan(globalCone(0)) && !std::isnan(globalCone(1))){
+        Cone cone = Cone(globalCone(0),globalCone(1),(int)globalCone(2),m_coneList.size()); //Temp id, think of system later
+        cone.addObservation(localCone, globalCone,m_poseId,m_currentConeIndex);
+        m_coneList.push_back(cone);  
+      }
     }
   }
   m_currentConeDiff = m_currentConeIndex - currentConeIndex;
@@ -863,7 +871,7 @@ void Slam::filterMap(){
       }
 
     }
-    if(closestPoseDistance > 3){
+    if(closestPoseDistance > 4 || m_coneList[i].getObservations()<2){
       m_coneList[i].setValidState(false);
     }
     else{
@@ -909,8 +917,6 @@ void Slam::filterMap(){
 
 
   //}
-
-
 }
 
 void Slam::setUp(std::map<std::string, std::string> configuration)

@@ -35,8 +35,8 @@ Cone::Cone(double x, double y,int type,int id):
 }
 
 opendlv::logic::perception::ObjectDirection Cone::getDirection(Eigen::Vector3d pose){
-  double x = m_x-pose(0);
-  double y = m_y-pose(1);
+  double x = m_optX-pose(0);
+  double y = m_optY-pose(1);
   double newX = x*cos(-pose(2))-y*sin(-pose(2));
   double newY = x*sin(-pose(2))+y*cos(-pose(2));
   //double heading = pose(2)*static_cast<double>(1/RAD2DEG);
@@ -49,8 +49,8 @@ opendlv::logic::perception::ObjectDirection Cone::getDirection(Eigen::Vector3d p
 }
 
 opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pose){
-  double x = m_x-pose(0);
-  double y = m_y-pose(1);
+  double x = m_optX-pose(0);
+  double y = m_optY-pose(1);
   double distance = sqrt(x*x+y*y);
   opendlv::logic::perception::ObjectDistance msgDistance;
   msgDistance.distance(static_cast<float>(distance));

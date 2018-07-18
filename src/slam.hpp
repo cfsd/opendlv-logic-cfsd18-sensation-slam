@@ -141,6 +141,7 @@ public:
   uint32_t m_senderStamp = 0;
   float m_yawRate = 0.0f;
   float m_groundSpeed = 0.0f;
+  bool m_gpsCoords = false;
   cluon::data::TimeStamp m_yawReceivedTime = {};
   cluon::data::TimeStamp m_groundSpeedReceivedTime = {};
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
