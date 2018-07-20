@@ -162,7 +162,7 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
       cones(0,coneIndex) = direction.azimuthAngle();
       cones(1,coneIndex) = direction.zenithAngle();
       cones(2,coneIndex) = distance.distance();
-      cones(3,coneIndex) = type.type();
+      cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
       coneIndex++;
       it++;
     }
@@ -376,6 +376,10 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
   double minDistance = 100;
   for(uint32_t i = 0; i<cones.cols(); i++){//Iterate through local cone objects
+    if(fabs(cones(0,i))<0.00001 || fabs(cones(1,i))<0.00001 || fabs(cones(2,i))<0.00001)
+    {
+      continue;
+    }
     double distanceToCar = cones(2,i);
     Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i)); //Make local cone into global coordinate frame
