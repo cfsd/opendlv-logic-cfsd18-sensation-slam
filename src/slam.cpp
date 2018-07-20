@@ -916,7 +916,7 @@ if(cones.cols() > 2){
         }  
           int conesThatFits = 0;
           for(uint32_t l = 0; l < coneErrors.size(); l++){
-            if(coneErrors[l] < 1.5){
+            if(coneErrors[l] < 0.5){
 
               conesThatFits++;
             }
@@ -932,7 +932,7 @@ if(cones.cols() > 2){
         
           coneErrors.clear();
   }  
-  if(bestSumError < 3){
+  if(bestSumError < 2){
 
     return bestHeading;
   }else{
