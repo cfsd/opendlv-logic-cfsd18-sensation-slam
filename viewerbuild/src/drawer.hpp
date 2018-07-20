@@ -19,6 +19,7 @@ class Drawer{
         void drawOptimizedCones();
         void drawEssentialCones();
         void drawCurrentPose();
+        void drawCurrentUKFPose();
         void drawGraph();
 
     private:

@@ -156,7 +156,25 @@ void Drawer::drawCurrentPose(){
     }
     glEnd();
 }
-
+void Drawer::drawCurrentUKFPose(){
+    m_pose = slam.drawCurrentUKFPose();
+    uint32_t nPoints = static_cast<unsigned int>(m_pose.rows());
+    if(nPoints == 0){
+        return;
+    }    
+    glPointSize(12);
+    glBegin(GL_POINTS);
+    glColor3f(1.0,0.0,0.0);
+    for(uint32_t i = 0; i<nPoints; i++){
+        float x = static_cast<float>(m_pose(0)/5);
+        float y = static_cast<float>(m_pose(1)/5);
+        float z = 0.0f;
+        glVertex3f(x,y,z);
+        glColor3f(0.0,1.0,0.0);
+        glVertex3f(x+static_cast<float>(2*cos(m_pose(2))/5),y+static_cast<float>(2*sin(m_pose(2))/5),z);
+    }
+    glEnd();
+}
 void Drawer::drawGraph(){
     m_poses = slam.drawPoses();
     uint32_t nPoints = static_cast<unsigned int>(m_poses.size());
