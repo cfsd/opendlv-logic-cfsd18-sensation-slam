@@ -874,7 +874,7 @@ if(doOpt){
 double Slam::optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose){
 
 //Find surrounding cone indexes of 20 meters
-if(cones.cols() > 2){
+if(cones.cols() > 1){
   double initPose = pose(2);
   std::vector<uint32_t> inMapIndex;
   for(uint32_t i = 0; i < m_map.size(); i++){
@@ -891,11 +891,13 @@ if(cones.cols() > 2){
 
   double bestHeading = 0;
   double bestSumError = 100000;
+  uint32_t conesThatFits = 0;
   std::vector<double> coneErrors;
     for(double k = angle; k < angleMax; k = k + angleStep){
       pose(2) = k;
       double sumOfAllErrors = 0;
-      int lastConeFitter = 0;
+      uint32_t lastConeFitter = 0;
+      bool foundFullMatch = false;
       for(uint32_t i = 0; i < cones.cols(); i++){
         Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
         double minimumError = 100000;
@@ -914,25 +916,40 @@ if(cones.cols() > 2){
           betterSum = true;
           
         }  
-          int conesThatFits = 0;
+          conesThatFits = 0;
           for(uint32_t l = 0; l < coneErrors.size(); l++){
             if(coneErrors[l] < 0.5){
 
               conesThatFits++;
             }
           }
+
+          //CheckOutliers
+
+
+
+
           std::cout << "Fitted Cones: " << conesThatFits << std::endl;
-          if(conesThatFits > 2 && conesThatFits >= lastConeFitter && betterSum){
-            std::cout << "new Best Heading: " << k << std::endl;
-            std::cout << "best Error: " << sumOfAllErrors << std::endl;
-            bestHeading = k;
-            lastConeFitter = conesThatFits;
-            bestSumError = sumOfAllErrors;
-          }
-        
+          if(conesThatFits == cones.cols() && !foundFullMatch){
+              std::cout << "new Best Heading: " << k << std::endl;
+              std::cout << "best Error: " << sumOfAllErrors << std::endl;
+              bestHeading = k;
+              lastConeFitter = conesThatFits;
+              bestSumError = sumOfAllErrors;
+              foundFullMatch = true;
+          }else if(conesThatFits > 1 && conesThatFits >= lastConeFitter && betterSum){
+              std::cout << "new Best Heading: " << k << std::endl;
+              std::cout << "best Error: " << sumOfAllErrors << std::endl;
+              bestHeading = k;
+              lastConeFitter = conesThatFits;
+              bestSumError = sumOfAllErrors;
+            }
+                  
           coneErrors.clear();
   }  
-  if(bestSumError < 2){
+
+  double bestThreshold = 0.5*static_cast<double>(cones.cols());
+  if(bestSumError < bestThreshold){
 
     return bestHeading;
   }else{
