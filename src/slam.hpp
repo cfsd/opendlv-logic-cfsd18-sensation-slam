@@ -97,7 +97,6 @@ public:
   double distanceBetweenConesOpt(Cone c1, Cone c2);
   void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
   void filterMap();
-  double optimizeHeading2(Eigen::MatrixXd cones,Eigen::Vector3d pose);
   double optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose);
   void sendCones();
   void sendPose();
@@ -152,7 +151,7 @@ public:
   std::vector<Cone> m_coneList = {};
   bool m_filterMap = false;
   bool m_readyState = false;
-  bool m_readyStateMachine = true;
+  bool m_readyStateMachine = false;
   
   std::vector<std::vector<int>> m_headingPerms4 = {};
   std::vector<std::vector<int>> m_headingPerms3 = {};

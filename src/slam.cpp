@@ -308,7 +308,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   }
   m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size());
   bool performedLocalization = false;
-  if(matchedConeIndex.size() > 2 ){  
+  if(matchedConeIndex.size() > 1 ){  
     //Create graph
     //Add pose vertex
     g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
@@ -744,133 +744,6 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
   return recievedPoint;
 }
 
-double Slam::optimizeHeading2(Eigen::MatrixXd cones,Eigen::Vector3d pose){
-
-std::cout << "Optimizing Heading ..." << std::endl;
-//Select interval in map around current cone index to find best suitable cone set 
-double bestHeading = 0;
-double oneDeg = 0.01745*2;
-double angle = -PI;
-double initialHeading = pose(2);
-  double lastBestErrorDistance = 1000000;
-uint32_t coneFrameSize = cones.cols();
-bool doOpt = false; 
-if(coneFrameSize > 4){
-  coneFrameSize = 4;
-  doOpt = true;
-}else if(coneFrameSize == 3){
-  doOpt = true;
-}
-
-if(doOpt){
-  int32_t startConeSet = m_currentConeIndex;
-  startConeSet = (startConeSet < 0)?(m_map.size() - startConeSet):(startConeSet);
-  for(uint32_t i = 0; i < 4; i++){
-    angle = -PI;
-    //For each i iterate through coneSet with local coneframe size
-    startConeSet = startConeSet + i;
-      
-      if(coneFrameSize == 4){       
-        for(double k = angle; k < PI; k = k + oneDeg){
-          pose(2) = k;
-          Eigen::Vector3d globalCone1 = coneToGlobal(pose, cones.col(0));
-          Eigen::Vector3d globalCone2 = coneToGlobal(pose, cones.col(1));
-          Eigen::Vector3d globalCone3 = coneToGlobal(pose, cones.col(2));
-          Eigen::Vector3d globalCone4 = coneToGlobal(pose, cones.col(3));
-
-          //Check reprojection error of all combinations with this angle
-          double errorDistance = 0;
-          for(uint32_t j = 0; j < m_headingPerms4.size(); j++){
-            uint32_t i1 = startConeSet + m_headingPerms4[j][0]-1;
-            if(i1 > m_map.size()){
-              i1 = i1 - m_map.size()-1;
-            }
-            uint32_t i2 = startConeSet + m_headingPerms4[j][1]-1;
-            if(i2 > m_map.size()){
-              i2 = i2 - m_map.size()-1;
-            }
-            uint32_t i3 = startConeSet + m_headingPerms4[j][2]-1;
-            if(i3 > m_map.size()){
-              i3 = i3 - m_map.size()-1;
-            }
-            uint32_t i4 = startConeSet + m_headingPerms4[j][3]-1;
-            if(i4 > m_map.size()){
-              i4 = i4 - m_map.size()-1;
-            }
-
-            //std::cout << "index: " << i1 << " " << i2 << " " << i3 << " " << i4 << std::endl;
-            errorDistance += std::sqrt( (globalCone1(0)-m_map[i1].getOptX())*(globalCone1(0)-m_map[i1].getOptX()) + (globalCone1(1)-m_map[i1].getOptY())*(globalCone1(1)-m_map[i1].getOptY()) );
-            errorDistance += std::sqrt( (globalCone2(0)-m_map[i2].getOptX())*(globalCone2(0)-m_map[i2].getOptX()) + (globalCone2(1)-m_map[i2].getOptY())*(globalCone2(1)-m_map[i2].getOptY()) );
-            errorDistance += std::sqrt( (globalCone3(0)-m_map[i3].getOptX())*(globalCone3(0)-m_map[i3].getOptX()) + (globalCone3(1)-m_map[i3].getOptY())*(globalCone3(1)-m_map[i3].getOptY()) );
-            errorDistance += std::sqrt( (globalCone4(0)-m_map[i4].getOptX())*(globalCone4(0)-m_map[i4].getOptX()) + (globalCone4(1)-m_map[i4].getOptY())*(globalCone4(1)-m_map[i4].getOptY()) );
-           
-            if(errorDistance < lastBestErrorDistance){
-
-              lastBestErrorDistance = errorDistance;
-              bestHeading = k;
-              //std::cout << "error distance: " << errorDistance << "best heading: " << k << std::endl;
-            }
-          }
-        }
-      }
-
-      //-----------------------------------
-    if(coneFrameSize == 3){  
-      for(double k = angle; k < PI; k = k + oneDeg){
-          pose(2) = k;
-          Eigen::Vector3d globalCone1 = coneToGlobal(pose, cones.col(0));
-          Eigen::Vector3d globalCone2 = coneToGlobal(pose, cones.col(1));
-          Eigen::Vector3d globalCone3 = coneToGlobal(pose, cones.col(2));
-
-          //Check reprojection error of all combinations with this angle
-          double errorDistance = 0;
-          for(uint32_t j = 0; j < m_headingPerms3.size(); j++){
-            uint32_t i1 = startConeSet + m_headingPerms3[j][0]-1;
-            if(i1 > m_map.size()){
-              i1 = i1 - m_map.size()-1;
-            }
-            uint32_t i2 = startConeSet + m_headingPerms3[j][1]-1;
-            if(i2 > m_map.size()){
-              i2 = i2 - m_map.size()-1;
-            }
-            uint32_t i3 = startConeSet + m_headingPerms3[j][2]-1;
-            if(i3 > m_map.size()){
-              i3 = i3 - m_map.size()-1;
-            }
-    
-
-            //std::cout << "index: " << i1 << " " << i2 << " " << i3 << " " << i4 << std::endl;
-            errorDistance += std::sqrt( (globalCone1(0)-m_map[i1].getOptX())*(globalCone1(0)-m_map[i1].getOptX()) + (globalCone1(1)-m_map[i1].getOptY())*(globalCone1(1)-m_map[i1].getOptY()) );
-            errorDistance += std::sqrt( (globalCone2(0)-m_map[i2].getOptX())*(globalCone2(0)-m_map[i2].getOptX()) + (globalCone2(1)-m_map[i2].getOptY())*(globalCone2(1)-m_map[i2].getOptY()) );
-            errorDistance += std::sqrt( (globalCone3(0)-m_map[i3].getOptX())*(globalCone3(0)-m_map[i3].getOptX()) + (globalCone3(1)-m_map[i3].getOptY())*(globalCone3(1)-m_map[i3].getOptY()) );
-           
-            if(errorDistance < lastBestErrorDistance){
-
-              lastBestErrorDistance = errorDistance;
-              bestHeading = k;
-              //std::cout << "error distance: " << errorDistance << "best heading: " << k << std::endl;
-            }
-          }
-        }
-      }  
-
-  }
-}
-  //reproject the n amount of locally observed cones in the global map with new heading
-
-  //match all cones with all possible combinations and calculate error
-
-  //Save heading which give the smallest reprojection error
-  if(doOpt && lastBestErrorDistance < 3){
-
-    std::cout << "optimized heading: " << bestHeading << " errorDistance: " << lastBestErrorDistance << std::endl;
-    return bestHeading;
-  }else{
-
-    return initialHeading;
-  } 
-}
-
 double Slam::optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose){
 
 //Find surrounding cone indexes of 20 meters
@@ -925,11 +798,11 @@ if(cones.cols() > 1){
           }
 
           //CheckOutliers
+          
 
 
 
-
-          std::cout << "Fitted Cones: " << conesThatFits << std::endl;
+          //std::cout << "Fitted Cones: " << conesThatFits << std::endl;
           if(conesThatFits == cones.cols() && !foundFullMatch){
               std::cout << "new Best Heading: " << k << std::endl;
               std::cout << "best Error: " << sumOfAllErrors << std::endl;
