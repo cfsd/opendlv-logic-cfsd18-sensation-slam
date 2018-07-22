@@ -63,8 +63,10 @@ public:
   bool getModuleState();
   std::vector<Eigen::Vector3d> drawPoses();
   Eigen::Vector3d drawCurrentPose();
+  Eigen::Vector3d drawCurrentUKFPose();
   std::vector<std::vector<int>> drawGraph();
   void recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
+  std::vector<std::vector<int>> getPermutations(int n);
   void initializeModule();
 
  private:
@@ -95,6 +97,7 @@ public:
   double distanceBetweenConesOpt(Cone c1, Cone c2);
   void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
   void filterMap();
+  double optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose);
   void sendCones();
   void sendPose();
   void writeToPoseAndMapFile();
@@ -147,11 +150,11 @@ public:
   cluon::data::TimeStamp m_geolocationReceivedTime ={};
   std::vector<Cone> m_coneList = {};
   bool m_filterMap = false;
-  bool m_localization;
   bool m_readyState = false;
-  bool m_readyStateMachine = true;
+  bool m_readyStateMachine = false;
   
-
+  std::vector<std::vector<int>> m_headingPerms4 = {};
+  std::vector<std::vector<int>> m_headingPerms3 = {};
     // Constants for degree transformation
   const double DEG2RAD = 0.017453292522222; // PI/180.0
   const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;

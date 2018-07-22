@@ -42,7 +42,6 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_newFrame()
 , m_sendPose()
 , m_sendMutex()
-, m_localization()
 {
   setupOptimizer();
   setUp(commandlineArguments);
@@ -194,14 +193,6 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   {
     std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
     pose = m_odometryData;
-    double timeElapsed = fabs(static_cast<double>(cluon::time::deltaInMicroseconds(m_yawReceivedTime, m_lastTimeStamp)))/1000000;
-
-    {
-      std::lock_guard<std::mutex> lockYaw(m_yawMutex);
-      if(timeElapsed > 0 && timeElapsed < 1){
-        pose(2) = pose(2); // - static_cast<double>(m_yawRate)*(timeElapsed);
-      }
-    }  
     m_poses.push_back(pose);
   }
   if(!m_loopClosingComplete){
@@ -243,9 +234,9 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 
     //Localizer
     if(m_loopClosingComplete){
-      localizer(cones, pose); //False or True for pose optimization
-      sendPose();
-      sendCones();
+        localizer(cones, pose); //False or True for pose optimization
+        sendPose();
+        sendCones();
     }
 
 }
@@ -278,6 +269,13 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   localGraph.setVerbose(true);
 
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
+
+  //Optimize Heading
+
+  double optimizedHeading = optimizeHeading(cones,pose);
+  pose(2) = optimizedHeading;
+
+
   //Find match in conelist
   std::vector<int> matchedConeIndex;
   std::vector<Eigen::Vector3d> localObs;
@@ -290,7 +288,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
       double distance = distanceBetweenConesOpt(m_map[j],globalConeObject);
 
-      if(distance < m_newConeThreshold){ //m_newConeThreshold
+      if(distance < 1.5){ //m_newConeThreshold
         matchedConeIndex.push_back(j);
 
         Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
@@ -308,11 +306,9 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       j++;
     }
   }
-  //std::cout << "Current Cone is (before): " << m_currentConeIndex << std::endl;
   m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size());
-  //std::cout << "Current Cone is (after): " << m_currentConeIndex << std::endl;
-
-  if(matchedConeIndex.size() > 0 && m_localization){  
+  bool performedLocalization = false;
+  if(matchedConeIndex.size() > 1 ){  
     //Create graph
     //Add pose vertex
     g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
@@ -339,36 +335,30 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       xyMeasurement << localObs[i](0),localObs[i](1);
       coneMeasurement->setMeasurement(xyMeasurement);
 
-      //Eigen::Vector2d covXY = m_coneList[matchedConeIndex[i]].getCovariance();
       Eigen::Matrix2d informationMatrix;
       informationMatrix << 1/0.1,0,
                               0,1/0.1;
       coneMeasurement->setInformation(informationMatrix);
       localGraph.addEdge(coneMeasurement);
-
+      performedLocalization = true;
     }
-    /*g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(localGraph.vertex(0));
-    firstCone->setFixed(true);*/
-    //std::cout << "Optimizing" << std::endl;
-    localGraph.initializeOptimization();
-    localGraph.optimize(10); //Add config for amount of iterations??
-    //std::cout << "Optimizing done." << std::endl;
-    g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(localGraph.vertex(1000));
-    g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
-    Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
-    double poseDiff = std::sqrt((pose(0)-updatedPose(0))*(pose(0)-updatedPose(0))+(pose(1)-updatedPose(1))*(pose(1)-updatedPose(1)));
-    if(poseDiff<2.0){
+  }
+    if(performedLocalization){
+      localGraph.initializeOptimization();
+      localGraph.optimize(10); 
+      g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(localGraph.vertex(1000));
+      g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
+      Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
+
       std::lock_guard<std::mutex> lockSend(m_sendMutex);
       m_sendPose << updatedPose(0),updatedPose(1),updatedPose(2);
-      //std::cout << "pose: " << updatedPose(0) << " : " << updatedPose(1) << " : " << updatedPose(2) << std::endl;
+    }else{
+      std::lock_guard<std::mutex> lockSend(m_sendMutex);
+      m_sendPose << pose(0),pose(1),pose(2);
     }
-  }else{
-    std::lock_guard<std::mutex> lockSend(m_sendMutex);
-    m_sendPose << pose(0),pose(1),pose(2);
-  }
-
+  
+  
 }
-
 
 void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   int currentConeIndex = m_currentConeIndex;
@@ -754,6 +744,96 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
   return recievedPoint;
 }
 
+double Slam::optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose){
+
+//Find surrounding cone indexes of 20 meters
+if(cones.cols() > 1){
+  double initPose = pose(2);
+  std::vector<uint32_t> inMapIndex;
+  for(uint32_t i = 0; i < m_map.size(); i++){
+    opendlv::logic::perception::ObjectDistance objDistance = m_map[i].getDistance(pose);
+    if(objDistance.distance() < 30){
+      inMapIndex.push_back(i);
+    }
+  }
+  double angle = pose(2)-PI/4;
+  
+  double angleMax = pose(2)+PI/4;
+  double degrees = 2;
+  double angleStep = 0.01745*degrees;
+
+  double bestHeading = 0;
+  double bestSumError = 100000;
+  uint32_t conesThatFits = 0;
+  std::vector<double> coneErrors;
+    for(double k = angle; k < angleMax; k = k + angleStep){
+      pose(2) = k;
+      double sumOfAllErrors = 0;
+      uint32_t lastConeFitter = 0;
+      bool foundFullMatch = false;
+      for(uint32_t i = 0; i < cones.cols(); i++){
+        Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
+        double minimumError = 100000;
+        
+        for(uint32_t j = 0; j < inMapIndex.size(); j++){
+        double errorDistance = std::sqrt( (globalCone(0)-m_map[inMapIndex[j]].getOptX())*(globalCone(0)-m_map[inMapIndex[j]].getOptX()) + (globalCone(1)-m_map[inMapIndex[j]].getOptY())*(globalCone(1)-m_map[inMapIndex[j]].getOptY()) );
+          if(errorDistance < minimumError){
+            minimumError = errorDistance;
+          }
+        }//Map
+        sumOfAllErrors += minimumError;
+        coneErrors.push_back(minimumError);        
+      }//Local Frame
+        bool betterSum = false;
+        if(sumOfAllErrors < bestSumError){
+          betterSum = true;
+          
+        }  
+          conesThatFits = 0;
+          for(uint32_t l = 0; l < coneErrors.size(); l++){
+            if(coneErrors[l] < 0.5){
+
+              conesThatFits++;
+            }
+          }
+
+          //CheckOutliers
+          
+
+
+
+          //std::cout << "Fitted Cones: " << conesThatFits << std::endl;
+          if(conesThatFits == cones.cols() && !foundFullMatch){
+              std::cout << "new Best Heading: " << k << std::endl;
+              std::cout << "best Error: " << sumOfAllErrors << std::endl;
+              bestHeading = k;
+              lastConeFitter = conesThatFits;
+              bestSumError = sumOfAllErrors;
+              foundFullMatch = true;
+          }else if(conesThatFits > 1 && conesThatFits >= lastConeFitter && betterSum){
+              std::cout << "new Best Heading: " << k << std::endl;
+              std::cout << "best Error: " << sumOfAllErrors << std::endl;
+              bestHeading = k;
+              lastConeFitter = conesThatFits;
+              bestSumError = sumOfAllErrors;
+            }
+                  
+          coneErrors.clear();
+  }  
+
+  double bestThreshold = 0.5*static_cast<double>(cones.cols());
+  if(bestSumError < bestThreshold){
+
+    return bestHeading;
+  }else{
+    return initPose;
+  }
+}
+
+  return pose(2);
+
+}
+
 void Slam::sendCones()
 {
   Eigen::Vector3d pose;
@@ -782,15 +862,9 @@ void Slam::sendCones()
 void Slam::sendPose(){
   opendlv::logic::sensation::Geolocation poseMessage;
   std::lock_guard<std::mutex> lockSend(m_sendMutex); 
-
-  std::array<double,2> cartesianPos;
-  cartesianPos[0] = m_sendPose(0);
-  cartesianPos[1] = m_sendPose(1);
-  std::array<double,2> sendGPS = wgs84::fromCartesian(m_gpsReference, cartesianPos);
-  poseMessage.longitude(static_cast<float>(sendGPS[0]));
-  poseMessage.latitude(static_cast<float>(sendGPS[1]));
+  poseMessage.longitude(m_sendPose(0));
+  poseMessage.latitude(m_sendPose(1));
   poseMessage.heading(static_cast<float>(m_sendPose(2)));
-  //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
   cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
   od4.send(poseMessage, sampleTime ,m_senderStamp);
 }
@@ -936,9 +1010,99 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   m_lapSize = std::stoi(configuration["lapSize"]);
   //std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
-  m_localization = static_cast<bool>(std::stoi(configuration["localization"]));
 
+  //Create permutaions for optimize heading
+  m_headingPerms4 = getPermutations(4);
 
+  for(uint32_t i = 0; i < m_headingPerms4.size(); i++){
+
+    std::cout << m_headingPerms4[i][0] << " " << m_headingPerms4[i][1] << " " << m_headingPerms4[i][2] << " " << m_headingPerms4[i][3] << std::endl;
+
+  }
+
+  m_headingPerms3 = getPermutations(3);
+  for(uint32_t i = 0; i < m_headingPerms3.size(); i++){
+
+    std::cout << m_headingPerms3[i][0] << " " << m_headingPerms3[i][1] << " " << m_headingPerms3[i][2] << std::endl;
+
+  }
+}
+
+std::vector<std::vector<int>> Slam::getPermutations(int n){
+
+    std::vector<std::vector<int>> perms;
+  if(n==4){
+        int array[4]={1,2,3,4};
+        int addCounter = 0;
+      for (int cnt4=4;cnt4!=0;--cnt4){
+          for (int cnt3=3;cnt3!=0;--cnt3){
+             for (int cnt2=2;cnt2!=0;--cnt2){
+                 std::vector<int> currentPerm;
+                  currentPerm.push_back(array[0]);
+                  currentPerm.push_back(array[1]);
+                  currentPerm.push_back(array[2]);
+                  currentPerm.push_back(array[3]);
+                  perms.push_back(currentPerm);
+                  addCounter++;
+                 int swap2=array[2];
+                 array[2]=array[3];
+                 array[3]=swap2;
+             }
+             int swap3=array[1];
+             array[1]=array[2];
+             array[2]=array[3];
+             array[3]=swap3;
+          }
+          int swap4=array[0];
+          array[0]=array[1];
+          array[1]=array[2];
+          array[2]=array[3];
+          array[3]=swap4;
+      }
+  }
+    if(n==3){
+
+        int array1[3]={1,2,3};
+        int array2[3]={2,1,3};
+        int array3[3]={3,1,2};
+        int array4[3]={1,3,2};
+        int array5[3]={2,3,1};
+        int array6[3]={3,2,1};
+      
+      std::vector<int> currentPerm;
+      currentPerm.push_back(array1[0]);
+      currentPerm.push_back(array1[1]);
+      currentPerm.push_back(array1[2]);  
+      perms.push_back(currentPerm);
+      currentPerm.clear();
+      currentPerm.push_back(array2[0]);
+      currentPerm.push_back(array2[1]);
+      currentPerm.push_back(array2[2]);  
+      perms.push_back(currentPerm);
+      currentPerm.clear();
+      currentPerm.push_back(array3[0]);
+      currentPerm.push_back(array3[1]);
+      currentPerm.push_back(array3[2]);  
+      perms.push_back(currentPerm);
+      currentPerm.clear();
+      currentPerm.push_back(array4[0]);
+      currentPerm.push_back(array4[1]);
+      currentPerm.push_back(array4[2]);  
+      perms.push_back(currentPerm);
+      currentPerm.clear();
+      currentPerm.push_back(array5[0]);
+      currentPerm.push_back(array5[1]);
+      currentPerm.push_back(array5[2]);  
+      perms.push_back(currentPerm);
+      currentPerm.clear();
+      currentPerm.push_back(array6[0]);
+      currentPerm.push_back(array6[1]);
+      currentPerm.push_back(array6[2]);  
+      perms.push_back(currentPerm);
+      currentPerm.clear();
+    
+  }
+      return perms;
 }
 void Slam::initializeModule(){
   //local Gps Vars
@@ -1053,7 +1217,12 @@ Eigen::Vector3d Slam::drawCurrentPose(){
     return m_odometryData;
   }
 }
+Eigen::Vector3d Slam::drawCurrentUKFPose(){
 
+    std::lock_guard<std::mutex> lock(m_sensorMutex);
+    return m_odometryData;
+  
+}
 std::vector<std::vector<int>> Slam::drawGraph(){
   std::lock_guard<std::mutex> lock1(m_mapMutex);
   std::lock_guard<std::mutex> lock2(m_sensorMutex);

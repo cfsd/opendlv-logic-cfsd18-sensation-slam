@@ -27,6 +27,7 @@ void Viewer::Run(){
     pangolin::Var<bool> menuShowPoses("menu.ShowPoses",true,true);
     pangolin::Var<bool> menuShowEssentialCones("menu.ShowEssentialCones",true,true);
     pangolin::Var<bool> menuShowCurrentPose("menu.ShowCurrentPose",true,true);
+    pangolin::Var<bool> menuShowCurrentUKFPose("menu.ShowCurrentUKFPose",true,true);
     pangolin::Var<bool> menuShowGraph("menu.ShowGraph",true,true);
     pangolin::Var<bool> menuExit("menu.Exit",false,false);
 
@@ -57,6 +58,8 @@ void Viewer::Run(){
             m_drawer.drawPoses();
         if(menuShowCurrentPose)
             m_drawer.drawCurrentPose();
+        if(menuShowCurrentUKFPose)
+            m_drawer.drawCurrentUKFPose();
         if(menuShowGraph)
             m_drawer.drawGraph();
         pangolin::FinishFrame();
