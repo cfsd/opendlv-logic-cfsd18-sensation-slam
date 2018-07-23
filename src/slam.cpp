@@ -822,7 +822,7 @@ if(cones.cols() > 1){
   }  
 
   double bestThreshold = 0.5*static_cast<double>(cones.cols());
-  if(bestSumError < bestThreshold){
+  if(bestSumError < bestThreshold && std::fabs(bestHeading - initPose) < 0.5){
 
     return bestHeading;
   }else{
