@@ -234,9 +234,9 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 
     //Localizer
     if(m_loopClosingComplete){
-        localizer(cones, pose); //False or True for pose optimization
-        sendPose();
-        sendCones();
+      localizer(cones, pose); //False or True for pose optimization
+      sendPose();
+      sendCones();
     }
 
 }
@@ -275,7 +275,6 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   double optimizedHeading = optimizeHeading(cones,pose);
   pose(2) = optimizedHeading;
 
-
   //Find match in conelist
   std::vector<int> matchedConeIndex;
   std::vector<Eigen::Vector3d> localObs;
@@ -287,21 +286,11 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
       Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
       double distance = distanceBetweenConesOpt(m_map[j],globalConeObject);
-
       if(distance < 1.5){ //m_newConeThreshold
         matchedConeIndex.push_back(j);
-
         Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
         localObs.push_back(localCone);
         foundMatch = true;
-/*
-        if(distance < shortestDistance){
-
-          shortestDistance = distance;
-          //m_currentConeIndex = m_map[j].getId();
-
-        }
-        */
       }
       j++;
     }
@@ -745,7 +734,6 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
 }
 
 double Slam::optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose){
-
 //Find surrounding cone indexes of 20 meters
 if(cones.cols() > 1){
   double initPose = pose(2);
@@ -766,72 +754,60 @@ if(cones.cols() > 1){
   double bestSumError = 100000;
   uint32_t conesThatFits = 0;
   std::vector<double> coneErrors;
-    for(double k = angle; k < angleMax; k = k + angleStep){
-      pose(2) = k;
-      double sumOfAllErrors = 0;
-      uint32_t lastConeFitter = 0;
-      bool foundFullMatch = false;
-      for(uint32_t i = 0; i < cones.cols(); i++){
-        Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
-        double minimumError = 100000;
+  for(double k = angle; k < angleMax; k = k + angleStep){
+    pose(2) = k;
+    double sumOfAllErrors = 0;
+    uint32_t lastConeFitter = 0;
+    bool foundFullMatch = false;
+    for(uint32_t i = 0; i < cones.cols(); i++){
+      Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
+      double minimumError = 100000;
         
-        for(uint32_t j = 0; j < inMapIndex.size(); j++){
+      for(uint32_t j = 0; j < inMapIndex.size(); j++){
         double errorDistance = std::sqrt( (globalCone(0)-m_map[inMapIndex[j]].getOptX())*(globalCone(0)-m_map[inMapIndex[j]].getOptX()) + (globalCone(1)-m_map[inMapIndex[j]].getOptY())*(globalCone(1)-m_map[inMapIndex[j]].getOptY()) );
-          if(errorDistance < minimumError){
-            minimumError = errorDistance;
-          }
-        }//Map
-        sumOfAllErrors += minimumError;
-        coneErrors.push_back(minimumError);        
-      }//Local Frame
-        bool betterSum = false;
-        if(sumOfAllErrors < bestSumError){
-          betterSum = true;
-          
-        }  
-          conesThatFits = 0;
-          for(uint32_t l = 0; l < coneErrors.size(); l++){
-            if(coneErrors[l] < 0.5){
-
-              conesThatFits++;
-            }
-          }
-
-          //CheckOutliers
-          
-
-
-
-          //std::cout << "Fitted Cones: " << conesThatFits << std::endl;
-          if(conesThatFits == cones.cols() && !foundFullMatch){
-              std::cout << "new Best Heading: " << k << std::endl;
-              std::cout << "best Error: " << sumOfAllErrors << std::endl;
-              bestHeading = k;
-              lastConeFitter = conesThatFits;
-              bestSumError = sumOfAllErrors;
-              foundFullMatch = true;
-          }else if(conesThatFits > 1 && conesThatFits >= lastConeFitter && betterSum){
-              std::cout << "new Best Heading: " << k << std::endl;
-              std::cout << "best Error: " << sumOfAllErrors << std::endl;
-              bestHeading = k;
-              lastConeFitter = conesThatFits;
-              bestSumError = sumOfAllErrors;
-            }
-                  
-          coneErrors.clear();
-  }  
-
+        if(errorDistance < minimumError){
+          minimumError = errorDistance;
+        }
+      }//Map
+      sumOfAllErrors += minimumError;
+      coneErrors.push_back(minimumError);        
+    }//Local Frame
+    bool betterSum = false;
+    if(sumOfAllErrors < bestSumError){
+      betterSum = true;
+    }  
+    conesThatFits = 0;
+    for(uint32_t l = 0; l < coneErrors.size(); l++){
+      if(coneErrors[l] < 0.5){
+        conesThatFits++;
+      }
+    }
+    //CheckOutliers
+    //std::cout << "Fitted Cones: " << conesThatFits << std::endl;
+    if(conesThatFits == cones.cols() && !foundFullMatch){
+      std::cout << "new Best Heading: " << k << std::endl;
+      std::cout << "best Error: " << sumOfAllErrors << std::endl;
+      bestHeading = k;
+      lastConeFitter = conesThatFits;
+      bestSumError = sumOfAllErrors;
+      foundFullMatch = true;
+    }else if(conesThatFits > 1 && conesThatFits >= lastConeFitter && betterSum){
+      std::cout << "new Best Heading: " << k << std::endl;
+      std::cout << "best Error: " << sumOfAllErrors << std::endl;
+      bestHeading = k;
+      lastConeFitter = conesThatFits;
+      bestSumError = sumOfAllErrors;
+    }                  
+    coneErrors.clear();
+  }
   double bestThreshold = 0.5*static_cast<double>(cones.cols());
   if(bestSumError < bestThreshold){
-
     return bestHeading;
   }else{
     return initPose;
   }
 }
-
   return pose(2);
-
 }
 
 void Slam::sendCones()
