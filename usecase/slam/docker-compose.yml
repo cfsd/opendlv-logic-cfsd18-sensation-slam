@@ -2,9 +2,9 @@ version: '2'
 
 services:
     opendlv-logic-cfsd18-sensation-slam:
-        image: "slam:test"
+        image: "slam:develop"
         network_mode: "host"
         ipc: host
-        command: "opendlv-logic-cfsd18-sensation-slam --cid=${CID} --id=120 --detectConeId=116 --estimationId=112 --gatheringTimeMs=20 --sameConeThreshold=1.5 --refLatitude=57.714051 --refLongitude=11.948666 --timeBetweenKeyframes=150 --coneMappingThreshold=7 --conesPerPacket=20 --localization=1"
+        command: "opendlv-logic-cfsd18-sensation-slam --cid=48 --id=120 --stateMachineId=1401 --detectConeId=116 --estimationId=114 --gatheringTimeMs=80 --sameConeThreshold=1.5 --refLatitude=57.719264 --refLongitude=11.957777 --timeBetweenKeyframes=150 --coneMappingThreshold=4 --conesPerPacket=20 --localization=0 --lapSize=20"
 
 
