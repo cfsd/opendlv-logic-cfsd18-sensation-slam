@@ -801,7 +801,12 @@ if(cones.cols() > 1){
     coneErrors.clear();
   }
   double bestThreshold = 0.5*static_cast<double>(cones.cols());
+<<<<<<< HEAD
   if(bestSumError < bestThreshold){
+=======
+  if(bestSumError < bestThreshold && std::fabs(bestHeading - initPose) < 0.5){
+
+>>>>>>> 6d69bc084e5d2dd622b3f485830528ca286cdcbb
     return bestHeading;
   }else{
     return initPose;
@@ -987,99 +992,8 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   //std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
 
-  //Create permutaions for optimize heading
-  m_headingPerms4 = getPermutations(4);
-
-  for(uint32_t i = 0; i < m_headingPerms4.size(); i++){
-
-    std::cout << m_headingPerms4[i][0] << " " << m_headingPerms4[i][1] << " " << m_headingPerms4[i][2] << " " << m_headingPerms4[i][3] << std::endl;
-
-  }
-
-  m_headingPerms3 = getPermutations(3);
-  for(uint32_t i = 0; i < m_headingPerms3.size(); i++){
-
-    std::cout << m_headingPerms3[i][0] << " " << m_headingPerms3[i][1] << " " << m_headingPerms3[i][2] << std::endl;
-
-  }
 }
 
-std::vector<std::vector<int>> Slam::getPermutations(int n){
-
-    std::vector<std::vector<int>> perms;
-  if(n==4){
-        int array[4]={1,2,3,4};
-        int addCounter = 0;
-      for (int cnt4=4;cnt4!=0;--cnt4){
-          for (int cnt3=3;cnt3!=0;--cnt3){
-             for (int cnt2=2;cnt2!=0;--cnt2){
-                 std::vector<int> currentPerm;
-                  currentPerm.push_back(array[0]);
-                  currentPerm.push_back(array[1]);
-                  currentPerm.push_back(array[2]);
-                  currentPerm.push_back(array[3]);
-                  perms.push_back(currentPerm);
-                  addCounter++;
-                 int swap2=array[2];
-                 array[2]=array[3];
-                 array[3]=swap2;
-             }
-             int swap3=array[1];
-             array[1]=array[2];
-             array[2]=array[3];
-             array[3]=swap3;
-          }
-          int swap4=array[0];
-          array[0]=array[1];
-          array[1]=array[2];
-          array[2]=array[3];
-          array[3]=swap4;
-      }
-  }
-    if(n==3){
-
-        int array1[3]={1,2,3};
-        int array2[3]={2,1,3};
-        int array3[3]={3,1,2};
-        int array4[3]={1,3,2};
-        int array5[3]={2,3,1};
-        int array6[3]={3,2,1};
-      
-      std::vector<int> currentPerm;
-      currentPerm.push_back(array1[0]);
-      currentPerm.push_back(array1[1]);
-      currentPerm.push_back(array1[2]);  
-      perms.push_back(currentPerm);
-      currentPerm.clear();
-      currentPerm.push_back(array2[0]);
-      currentPerm.push_back(array2[1]);
-      currentPerm.push_back(array2[2]);  
-      perms.push_back(currentPerm);
-      currentPerm.clear();
-      currentPerm.push_back(array3[0]);
-      currentPerm.push_back(array3[1]);
-      currentPerm.push_back(array3[2]);  
-      perms.push_back(currentPerm);
-      currentPerm.clear();
-      currentPerm.push_back(array4[0]);
-      currentPerm.push_back(array4[1]);
-      currentPerm.push_back(array4[2]);  
-      perms.push_back(currentPerm);
-      currentPerm.clear();
-      currentPerm.push_back(array5[0]);
-      currentPerm.push_back(array5[1]);
-      currentPerm.push_back(array5[2]);  
-      perms.push_back(currentPerm);
-      currentPerm.clear();
-      currentPerm.push_back(array6[0]);
-      currentPerm.push_back(array6[1]);
-      currentPerm.push_back(array6[2]);  
-      perms.push_back(currentPerm);
-      currentPerm.clear();
-    
-  }
-      return perms;
-}
 void Slam::initializeModule(){
   //local Gps Vars
   double lastOdoX = 100000;

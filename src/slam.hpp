@@ -153,8 +153,6 @@ public:
   bool m_readyState = false;
   bool m_readyStateMachine = false;
   
-  std::vector<std::vector<int>> m_headingPerms4 = {};
-  std::vector<std::vector<int>> m_headingPerms3 = {};
     // Constants for degree transformation
   const double DEG2RAD = 0.017453292522222; // PI/180.0
   const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;
