@@ -138,6 +138,9 @@ public:
   int m_lapSize = 50;
   int m_poseId = 1000;
   int m_coneRef = 0;
+  double m_xOffset = 0;
+  double m_yOffset = 0;
+  double m_headingOffset = 0;
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
@@ -156,7 +159,7 @@ public:
   std::vector<Cone> m_coneList = {};
   bool m_filterMap = false;
   bool m_readyState = false;
-  bool m_readyStateMachine = false;
+  bool m_readyStateMachine = true;
   
     // Constants for degree transformation
   const double DEG2RAD = 0.017453292522222; // PI/180.0

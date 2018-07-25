@@ -62,7 +62,7 @@ void Slam::setupOptimizer(){
   
   g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
   m_optimizer.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
-  m_optimizer.setVerbose(true);
+  //m_optimizer.setVerbose(true);
 }
 
 void Slam::nextSplitPose(cluon::data::Envelope data){
@@ -125,9 +125,9 @@ void Slam::nextPose(cluon::data::Envelope data){
                       odometry.heading();
   }
   else{
-    m_odometryData << longitude,
-                      latitude,
-                      odometry.heading();
+    m_odometryData << longitude+m_xOffset,
+                      latitude+m_yOffset,
+                      odometry.heading()+m_headingOffset;
   }  //std::cout << "head: " << odometry.heading() << std::endl;                   
 }
 
@@ -339,6 +339,10 @@ std::pair<double,std::vector<uint32_t>> Slam::evaluatePose(Eigen::MatrixXd cones
 std::vector<std::pair<int,Eigen::Vector3d>> Slam::filterMatch(Eigen::MatrixXd cones, Eigen::Vector3d pose,std::pair<double,std::vector<uint32_t>> matchedCones){
   std::vector<uint32_t> matchedIndices = std::get<1>(matchedCones);
   std::vector<std::pair<int,Eigen::Vector3d>> matchedConeVector;
+  double errorSum = std::get<0>(matchedCones);
+  if(errorSum/cones.cols() > 1.5){
+    return matchedConeVector;
+  }
   for(int i = 0; i<cones.cols();i++){
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
     Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i),cones(1,i),cones(2,i));
@@ -348,7 +352,7 @@ std::vector<std::pair<int,Eigen::Vector3d>> Slam::filterMatch(Eigen::MatrixXd co
       matchedConeVector.push_back(match);
     }
   }
-  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,10);
+  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size());
   return matchedConeVector;
 }
 
@@ -381,7 +385,7 @@ void Slam::localizer(std::vector<std::pair<int,Eigen::Vector3d>> matchedCones, E
   
   g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
   localGraph.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
-  localGraph.setVerbose(true);
+  //localGraph.setVerbose(true);
 
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
 
@@ -439,7 +443,13 @@ bool Slam::checkLocalization(){
   double xOffset = m_sendPose(0) - m_odometryData(0);
   double yOffset = m_sendPose(1) - m_odometryData(1);
   double headingOffset = m_sendPose(2) - m_odometryData(2);
-  return fabs(xOffset)<1 && fabs(yOffset)<1 && fabs(headingOffset)<0.2;
+  bool goodOffset = fabs(xOffset)<0.7 && fabs(yOffset)<0.7 && fabs(headingOffset)<0.4;
+  if(goodOffset){
+    m_xOffset = xOffset+m_xOffset;
+    m_yOffset = yOffset+m_yOffset;
+    m_headingOffset = headingOffset+m_headingOffset;
+  }
+  return goodOffset;
 }
 
 void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
@@ -517,7 +527,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
   
   g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
   essentialGraph.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
-  essentialGraph.setVerbose(true);
+  //essentialGraph.setVerbose(true);
 
   std::vector<int> posesToGraph;
   //Find cones of conespan and extract poses
@@ -854,9 +864,9 @@ void Slam::sendCones()
 void Slam::sendPose(){
   opendlv::logic::sensation::Geolocation poseMessage;
   std::lock_guard<std::mutex> lockSend(m_sendMutex); 
-  poseMessage.longitude(m_sendPose(0));
-  poseMessage.latitude(m_sendPose(1));
-  poseMessage.heading(static_cast<float>(m_sendPose(2)));
+  poseMessage.longitude(m_sendPose(0)-m_xOffset);
+  poseMessage.latitude(m_sendPose(1)-m_yOffset);
+  poseMessage.heading(static_cast<float>(m_sendPose(2)-m_headingOffset));
   cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
   od4.send(poseMessage, sampleTime ,m_senderStamp);
 }
