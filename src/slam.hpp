@@ -79,7 +79,7 @@ public:
   Eigen::Vector3d updatePoseFromGraph();
   void addPosesToGraph();
   void performSLAM(Eigen::MatrixXd Cones);
-  void localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  void localizer(std::vector<std::pair<int,Eigen::Vector3d>>, Eigen::Vector3d pose);
   void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void createFullGraph();
   void optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
@@ -98,6 +98,11 @@ public:
   void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
   void filterMap();
   double optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose);
+  std::vector<std::pair<int,Eigen::Vector3d>> matchCones(Eigen::MatrixXd cones,Eigen::Vector3d &pose);
+  std::pair<double,std::vector<uint32_t>> evaluatePose(Eigen::MatrixXd cones, Eigen::Vector3d pose, std::vector<uint32_t> inMapIndex, uint32_t &conesThatFit);
+  std::vector<std::pair<int,Eigen::Vector3d>> filterMatch(Eigen::MatrixXd cones, Eigen::Vector3d pose,std::pair<double,std::vector<uint32_t>> matchedCones);
+  bool localizable(std::vector<std::pair<int,Eigen::Vector3d>> matchedCones);
+  bool checkLocalization();
   void sendCones();
   void sendPose();
   void writeToPoseAndMapFile();
