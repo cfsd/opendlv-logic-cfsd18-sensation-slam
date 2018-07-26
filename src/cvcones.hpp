@@ -17,41 +17,43 @@
  * USA.
  */
 
-#ifndef COLLECTOR_HPP
-#define COLLECTOR_HPP
+#ifndef CVCONES_HPP
+#define CVCONES_HPP
 
 #include <iostream>
 #include <cmath>
 #include <vector>
 #include <Eigen/Dense>
 #include "opendlv-standard-message-set.hpp"
-#include "slam.hpp"
-#include "cvcones.hpp"
-#include "cluon-complete.hpp"
 
+#include "cluon-complete.hpp"
+#include "cone.hpp"
 
 typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 
-class Collector{
+class CVCones{
   public:
-    Collector(Slam &slam, int, int);
-    ~Collector() = default;
-    void CollectCones(cluon::data::Envelope data);
-    void InitializeCollection();
-    void GetCompleteFrame();
-    void SendFrame();
+    CVCones();
+    ~CVCones() = default;
+  
+  void recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
+  void setCvCones(Eigen::MatrixXd cones);
+  std::vector<Cone> getCvCones();
+  void setTimeStamp(cluon::data::TimeStamp currentFrameTime);
+  cluon::data::TimeStamp getTimeStamp();
 
   private:
-    cluon::data::TimeStamp m_currentFrameTime = {};
-    std::map<int,ConePackage> m_currentFrame = {}; 
-    std::map<int,int> m_envelopeCount = {};
-    bool m_newFrame = true;
-    bool m_processing = false;
-    uint32_t m_messageCount = 0;
-    Slam &m_module;
-    uint32_t m_packetSize;
-    int m_timeDiffMilliseconds;
-    uint32_t m_numberOfItems = 1;
+  Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
+  Eigen::Vector2d transformConeToCoG(double angle, double distance);
+
+  std::vector<Cone> m_cones = {};
+  cluon::data::TimeStamp m_lastTimeStamp = {};
+  std::mutex m_coneMutex;
+  std::mutex m_stampMutex;
+  // Constants for degree transformation
+  const double DEG2RAD = 0.017453292522222; // PI/180.0
+  const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;
+  const double PI = 3.14159265f;
 };
 
 #endif

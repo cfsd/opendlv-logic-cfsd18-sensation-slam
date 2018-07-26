@@ -26,6 +26,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
   od4(a_od4)
 , m_optimizer()
 , m_lastTimeStamp()
+, m_lastCvTimeStamp()
 , m_coneCollector()
 , m_lastObjectId()
 , m_coneMutex()
@@ -42,6 +43,7 @@ Slam::Slam(std::map<std::string, std::string> commandlineArguments,cluon::OD4Ses
 , m_newFrame()
 , m_sendPose()
 , m_sendMutex()
+, m_cvCones()
 {
   setupOptimizer();
   setUp(commandlineArguments);
@@ -167,7 +169,28 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
   } 
   performSLAM(cones);
 }
+void Slam::recieveCombinedCvMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
+  m_lastCvTimeStamp = currentFrameTime;
+  Eigen::MatrixXd cones = Eigen::MatrixXd::Zero(4,currentFrame.size());
+  std::map<int,ConePackage>::iterator it;
+  int coneIndex = 0;
+  it =currentFrame.begin();
+  while(it != currentFrame.end()){
+    auto direction = std::get<0>(it->second);
+    auto distance = std::get<1>(it->second);
+    auto type = std::get<2>(it->second);
+    cones(0,coneIndex) = direction.azimuthAngle();
+    cones(1,coneIndex) = direction.zenithAngle();
+    cones(2,coneIndex) = distance.distance();
+    cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
+    coneIndex++;
+    it++;
+  } 
+  m_cvCones.setCvCones(cones);
+  m_cvCones.setTimeStamp(currentFrameTime);
 
+  //SendCvCones(m_cvCones.getCvCones());
+}
 bool Slam::isKeyframe(){
   cluon::data::TimeStamp startTime = cluon::time::now();
   double timeElapsed = fabs(static_cast<double>(cluon::time::deltaInMicroseconds(m_keyframeTimeStamp,startTime)))/1000;
@@ -241,7 +264,8 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
       }
     }
     m_sendPose = m_odometryData;
-    sendCones();
+    //sendCones();
+    SendCvCones(m_cvCones.getCvCones());
   }
 }
 
@@ -340,7 +364,13 @@ std::vector<std::pair<int,Eigen::Vector3d>> Slam::filterMatch(Eigen::MatrixXd co
   std::vector<uint32_t> matchedIndices = std::get<1>(matchedCones);
   std::vector<std::pair<int,Eigen::Vector3d>> matchedConeVector;
   double errorSum = std::get<0>(matchedCones);
-  if(errorSum/cones.cols() > 1.5){
+  if(cones.cols() == 2 && errorSum/cones.cols() > 0.3){
+    return matchedConeVector;
+  }
+  if(cones.cols() == 3 && errorSum/cones.cols() > 0.4){
+    return matchedConeVector;
+  }
+  if(cones.cols() > 3 && errorSum/cones.cols() > 0.5){
     return matchedConeVector;
   }
   for(int i = 0; i<cones.cols();i++){
@@ -352,22 +382,42 @@ std::vector<std::pair<int,Eigen::Vector3d>> Slam::filterMatch(Eigen::MatrixXd co
       matchedConeVector.push_back(match);
     }
   }
-  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size());
+  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size()-1);
   return matchedConeVector;
 }
 
 int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex, uint32_t remainingIter){
-  currentConeIndex=(currentConeIndex<m_map.size())?(currentConeIndex):(currentConeIndex-m_map.size());
-  Cone currentCone = m_map[currentConeIndex];
+  /*currentConeIndex=(currentConeIndex<m_map.size())?(currentConeIndex):(currentConeIndex-m_map.size());
+  Cone currentCone = m_map[remainingIter];
   remainingIter = remainingIter-1;
   auto distance = currentCone.getDistance(pose);
   auto direction = currentCone.getDirection(pose);
   if(remainingIter == 0){
-    return currentConeIndex-1;
+    //currentConeIndex += 1;
+    if(currentConeIndex > m_map.size()){
+      currentConeIndex = currentConeIndex - m_map.size();
+    }
+    return currentConeIndex;
   }
-  if(distance.distance() < 10.0f && fabs(direction.azimuthAngle())>80.0f){
-    currentConeIndex = updateCurrentCone(pose,currentConeIndex+1,remainingIter);
+  if(distance.distance() < 5.0f && fabs(direction.azimuthAngle())>80.0f){
+    currentConeIndex = updateCurrentCone(pose,currentConeIndex,remainingIter);
   }
+  return remainingIter;*/
+  remainingIter = remainingIter;
+  opendlv::logic::perception::ObjectDistance lastDistance;
+  lastDistance.distance(1000);
+  for(uint32_t i = 0; i < m_map.size(); i++){
+    Cone currentCone = m_map[i];
+    auto distance = currentCone.getDistance(pose);
+    auto direction = currentCone.getDirection(pose);
+    if(distance.distance() < 5.0f && fabs(direction.azimuthAngle())>80.0f){
+      if(distance.distance() < lastDistance.distance() )
+
+      lastDistance.distance(distance.distance());
+      currentConeIndex = i;
+    } 
+  }
+
   return currentConeIndex;
 }
 
@@ -836,6 +886,20 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
   return recievedPoint;
 }
 
+Eigen::Vector3d Slam::Cartesian2Spherical(double x, double y, double z)
+{
+  double distance = sqrt(x*x+y*y+z*z);
+  double azimuthAngle = atan2(y,x)*static_cast<double>(RAD2DEG);
+  double zenithAngle = 0;
+  
+  Eigen::Vector3d transformedPoints;
+
+  transformedPoints << azimuthAngle,zenithAngle,distance;
+
+  return transformedPoints;
+
+}
+
 void Slam::sendCones()
 {
   Eigen::Vector3d pose;
@@ -869,6 +933,30 @@ void Slam::sendPose(){
   poseMessage.heading(static_cast<float>(m_sendPose(2)-m_headingOffset));
   cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
   od4.send(poseMessage, sampleTime ,m_senderStamp);
+}
+
+void Slam::SendCvCones(std::vector<Cone> cones){
+  std::cout << "Sending out cvCones .." << std::endl;
+  cluon::data::TimeStamp sampleTime = m_lastCvTimeStamp;
+  for(uint32_t i = 0; i < cones.size(); i++){
+    uint32_t index = cones.size()-1-i;
+    Eigen::Vector3d sphericalPoints = Cartesian2Spherical(cones[index].getX(),cones[index].getY(),0);
+    opendlv::logic::perception::ObjectDirection coneDirection;
+    coneDirection.objectId(index);
+    coneDirection.azimuthAngle(static_cast<float>(sphericalPoints(0)));  //Negative to convert to car frame from LIDAR
+    coneDirection.zenithAngle(static_cast<float>(sphericalPoints(1)));
+    od4.send(coneDirection,sampleTime,m_senderStamp);
+
+    opendlv::logic::perception::ObjectDistance coneDistance;
+    coneDistance.objectId(index);
+    coneDistance.distance(static_cast<float>(sphericalPoints(2)));
+    od4.send(coneDistance,sampleTime,m_senderStamp);
+
+    opendlv::logic::perception::ObjectType coneType;
+    coneType.objectId(index);
+    coneType.type(cones[index].getType());
+    od4.send(coneType,sampleTime,m_senderStamp);
+  }
 }
 
 double Slam::distanceBetweenCones(Cone c1, Cone c2){
