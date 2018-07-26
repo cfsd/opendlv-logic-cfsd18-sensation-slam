@@ -62,7 +62,7 @@ void Slam::setupOptimizer(){
   
   g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
   m_optimizer.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
-  m_optimizer.setVerbose(true);
+  //m_optimizer.setVerbose(true);
 }
 
 void Slam::nextSplitPose(cluon::data::Envelope data){
@@ -125,9 +125,9 @@ void Slam::nextPose(cluon::data::Envelope data){
                       odometry.heading();
   }
   else{
-    m_odometryData << longitude,
-                      latitude,
-                      odometry.heading();
+    m_odometryData << longitude+m_xOffset,
+                      latitude+m_yOffset,
+                      odometry.heading()+m_headingOffset;
   }  //std::cout << "head: " << odometry.heading() << std::endl;                   
 }
 
@@ -150,24 +150,22 @@ void Slam::nextGroundSpeed(cluon::data::Envelope data){
 
 void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
   m_lastTimeStamp = currentFrameTime;
-  if(isKeyframe()){
-    Eigen::MatrixXd cones = Eigen::MatrixXd::Zero(4,currentFrame.size());
-    std::map<int,ConePackage>::iterator it;
-    int coneIndex = 0;
-    it =currentFrame.begin();
-    while(it != currentFrame.end()){
-      auto direction = std::get<0>(it->second);
-      auto distance = std::get<1>(it->second);
-      auto type = std::get<2>(it->second);
-      cones(0,coneIndex) = direction.azimuthAngle();
-      cones(1,coneIndex) = direction.zenithAngle();
-      cones(2,coneIndex) = distance.distance();
-      cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
-      coneIndex++;
-      it++;
-    }
-    performSLAM(cones);
-  }
+  Eigen::MatrixXd cones = Eigen::MatrixXd::Zero(4,currentFrame.size());
+  std::map<int,ConePackage>::iterator it;
+  int coneIndex = 0;
+  it =currentFrame.begin();
+  while(it != currentFrame.end()){
+    auto direction = std::get<0>(it->second);
+    auto distance = std::get<1>(it->second);
+    auto type = std::get<2>(it->second);
+    cones(0,coneIndex) = direction.azimuthAngle();
+    cones(1,coneIndex) = direction.zenithAngle();
+    cones(2,coneIndex) = distance.distance();
+    cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
+    coneIndex++;
+    it++;
+  } 
+  performSLAM(cones);
 }
 
 bool Slam::isKeyframe(){
@@ -211,34 +209,151 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     }
   }
 
-    m_poseId++;
+  m_poseId++;
 
-    //Check if there is enough loopclosing candidates
-    if(!m_loopClosingComplete){
-      if(m_currentConeDiff > m_lapSize){
-        std::lock_guard<std::mutex> lockMap(m_mapMutex);
-        fullBA();
-        m_loopClosingComplete = true;
-        m_filterMap = true;
-      }
-    }
-    //Map preprocessing
-    if(m_filterMap){
+  //Check if there is enough loopclosing candidates
+  if(!m_loopClosingComplete){
+    if(m_currentConeDiff > m_lapSize){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
-      std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
-      filterMap();
-      updateMap(0,m_coneList.size(),true);
-      m_filterMap = false;
-      m_currentConeIndex = 0;
+      fullBA();
+      m_loopClosingComplete = true;
+      m_filterMap = true;
     }
-
-    //Localizer
-    if(m_loopClosingComplete){
-        localizer(cones, pose); //False or True for pose optimization
+  }
+  //Map preprocessing
+  if(m_filterMap){
+    std::lock_guard<std::mutex> lockMap(m_mapMutex);
+    std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
+    filterMap();
+    updateMap(0,m_coneList.size(),true);
+    m_filterMap = false;
+    m_currentConeIndex = 0;
+  }
+  //Localizer
+  if(m_loopClosingComplete){
+    std::vector<std::pair<int,Eigen::Vector3d>> matchedCones = matchCones(cones,pose); 
+    if(localizable(matchedCones)){
+      localizer(matchedCones,pose);
+      if(checkLocalization()){
         sendPose();
         sendCones();
+        return;
+      }
     }
+    m_sendPose = m_odometryData;
+    sendCones();
+  }
+}
 
+std::vector<std::pair<int,Eigen::Vector3d>> Slam::matchCones(Eigen::MatrixXd cones,Eigen::Vector3d &pose){
+  //Find surrounding cone indexes of 20 meters
+  //double initPose = pose(2);
+  std::vector<uint32_t> inMapIndex;
+  for(uint32_t i = 0; i < m_map.size(); i++){
+    opendlv::logic::perception::ObjectDistance objDistance = m_map[i].getDistance(pose);
+    if(objDistance.distance() < 20){
+      inMapIndex.push_back(i);
+    }
+  }
+  uint32_t conesThatFit = 0;
+  std::pair<double,std::vector<uint32_t>> scoredMatch = evaluatePose(cones,pose,inMapIndex,conesThatFit);
+  if(std::get<0>(scoredMatch)/cones.cols()<1){
+    return filterMatch(cones,pose,scoredMatch);
+  }
+  double angle = pose(2)-PI/4;
+  double angleMax = pose(2)+PI/4;
+  double degrees = 2;
+  double angleStep = 0.01745*degrees;
+  std::vector<std::pair<double,std::vector<uint32_t>>> matchVector;
+  uint32_t lastConeFitter = 0;
+  double bestHeading = 0;
+  double bestSumError = 100000;
+  uint32_t minDistIdx = 0;
+  int counter = 0;
+  for(double k = angle; k < angleMax; k = k + angleStep){
+    pose(2) = k;
+    conesThatFit = 0;
+    bool foundFullMatch = false;
+    scoredMatch = evaluatePose(cones,pose,inMapIndex,conesThatFit);
+    matchVector.push_back(scoredMatch);
+    double sumOfAllErrors = std::get<0>(scoredMatch);
+    bool betterSum = false;
+    if(sumOfAllErrors < bestSumError){
+      betterSum = true;
+    }
+    //std::cout << "Fitted Cones: " << conesThatFits << std::endl;
+    if(conesThatFit == cones.cols() && !foundFullMatch){
+      std::cout << "new Best Heading: " << k << std::endl;
+      std::cout << "best Error: " << sumOfAllErrors << std::endl;
+      bestHeading = k;
+      lastConeFitter = conesThatFit;
+      bestSumError = sumOfAllErrors;
+      minDistIdx = counter;
+      foundFullMatch = true;
+    }else if(conesThatFit > 1 && conesThatFit >= lastConeFitter && betterSum){
+      std::cout << "new Best Heading: " << k << std::endl;
+      std::cout << "best Error: " << sumOfAllErrors << std::endl;
+      bestHeading = k;
+      minDistIdx = counter;
+      lastConeFitter = conesThatFit;
+      bestSumError = sumOfAllErrors;
+    }
+    counter++;                  
+  }
+  bestHeading = (bestHeading > PI)?(bestHeading-2*PI):(bestHeading);
+  bestHeading = (bestHeading < -PI)?(bestHeading+2*PI):(bestHeading);
+  pose(2) = bestHeading;
+  std::vector<std::pair<int,Eigen::Vector3d>> matchedCones = filterMatch(cones,pose,matchVector[minDistIdx]);
+  return matchedCones;
+}
+
+std::pair<double,std::vector<uint32_t>> Slam::evaluatePose(Eigen::MatrixXd cones, Eigen::Vector3d pose, std::vector<uint32_t> inMapIndex, uint32_t &fitCones){
+  double sumOfAllErrors = 0;
+  std::vector<double> coneErrors;
+  std::vector<uint32_t> matchedCone;
+  for(uint32_t i = 0; i < cones.cols(); i++){
+    Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
+    double minimumError = 100000;
+    uint32_t minIndex = 100;
+    for(uint32_t j = 0; j < inMapIndex.size(); j++){
+      double errorDistance = std::sqrt( (globalCone(0)-m_map[inMapIndex[j]].getOptX())*(globalCone(0)-m_map[inMapIndex[j]].getOptX()) + (globalCone(1)-m_map[inMapIndex[j]].getOptY())*(globalCone(1)-m_map[inMapIndex[j]].getOptY()) );
+      if(errorDistance < minimumError){
+        minIndex = inMapIndex[j];
+        minimumError = errorDistance;
+      }
+    }//Map
+    sumOfAllErrors += minimumError;
+    coneErrors.push_back(minimumError);        
+    matchedCone.push_back(minIndex);
+  }//Local Frame  
+  fitCones = 0;
+  for(uint32_t l = 0; l < coneErrors.size(); l++){
+    if(coneErrors[l] < 0.5){
+      fitCones++;
+    }
+  }
+  std::pair<double,std::vector<uint32_t>> scoredMatches = std::make_pair(sumOfAllErrors,matchedCone);
+  return scoredMatches;
+}
+
+std::vector<std::pair<int,Eigen::Vector3d>> Slam::filterMatch(Eigen::MatrixXd cones, Eigen::Vector3d pose,std::pair<double,std::vector<uint32_t>> matchedCones){
+  std::vector<uint32_t> matchedIndices = std::get<1>(matchedCones);
+  std::vector<std::pair<int,Eigen::Vector3d>> matchedConeVector;
+  double errorSum = std::get<0>(matchedCones);
+  if(errorSum/cones.cols() > 1.5){
+    return matchedConeVector;
+  }
+  for(int i = 0; i<cones.cols();i++){
+    Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
+    Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i),cones(1,i),cones(2,i));
+    double distance = std::sqrt( (globalCone(0)-m_map[matchedIndices[i]].getOptX())*(globalCone(0)-m_map[matchedIndices[i]].getOptX()) + (globalCone(1)-m_map[matchedIndices[i]].getOptY())*(globalCone(1)-m_map[matchedIndices[i]].getOptY()) );
+    if(distance<1.0){
+      std::pair<int,Eigen::Vector3d> match = std::make_pair(matchedIndices[i],localCone);
+      matchedConeVector.push_back(match);
+    }
+  }
+  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size());
+  return matchedConeVector;
 }
 
 int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex, uint32_t remainingIter){
@@ -256,7 +371,11 @@ int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex, uint
   return currentConeIndex;
 }
 
-void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
+bool Slam::localizable(std::vector<std::pair<int,Eigen::Vector3d>> matchedCones){
+  return matchedCones.size()>1;
+}
+
+void Slam::localizer(std::vector<std::pair<int,Eigen::Vector3d>> matchedCones, Eigen::Vector3d pose){
   g2o::SparseOptimizer localGraph;
   typedef g2o::BlockSolver<g2o::BlockSolverTraits<-1, -1> > slamBlockSolver;
   typedef g2o::LinearSolverEigen<slamBlockSolver::PoseMatrixType> slamLinearSolver;
@@ -266,62 +385,25 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
   
   g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
   localGraph.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
-  localGraph.setVerbose(true);
+  //localGraph.setVerbose(true);
 
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
 
-  //Optimize Heading
-
-  double optimizedHeading = optimizeHeading(cones,pose);
-  pose(2) = optimizedHeading;
-
-
-  //Find match in conelist
-  std::vector<int> matchedConeIndex;
-  std::vector<Eigen::Vector3d> localObs;
-  //double shortestDistance = 10000;
-  for(uint32_t i = 0; i < cones.cols(); i++){
-    bool foundMatch = false;
-    uint32_t j = 0;
-    while(!foundMatch && j < m_map.size()){
-      Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
-      Cone globalConeObject = Cone(globalCone(0), globalCone(1),0,2000);
-      double distance = distanceBetweenConesOpt(m_map[j],globalConeObject);
-
-      if(distance < 1.5){ //m_newConeThreshold
-        matchedConeIndex.push_back(j);
-
-        Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i), cones(1,i),cones(2,i));
-        localObs.push_back(localCone);
-        foundMatch = true;
-/*
-        if(distance < shortestDistance){
-
-          shortestDistance = distance;
-          //m_currentConeIndex = m_map[j].getId();
-
-        }
-        */
-      }
-      j++;
-    }
-  }
-  m_currentConeIndex = updateCurrentCone(pose,m_currentConeIndex,m_map.size());
   bool performedLocalization = false;
-  if(matchedConeIndex.size() > 1 ){  
+  if(matchedCones.size() > 1 ){  
     //Create graph
     //Add pose vertex
     g2o::VertexSE2* poseVertex = new g2o::VertexSE2;
     poseVertex->setId(1000);
     poseVertex->setEstimate(pose);
     localGraph.addVertex(poseVertex);
-
     //Add cone vertex
     Eigen::Vector2d coneMeanXY;
-    for(uint32_t i = 0; i < matchedConeIndex.size(); i++){
-
+    for(uint32_t i = 0; i < matchedCones.size(); i++){
+      Eigen::Vector3d localObs = std::get<1>(matchedCones[i]);
+      int index = std::get<0>(matchedCones[i]);
       g2o::EdgeSE2PointXY* coneMeasurement = new g2o::EdgeSE2PointXY;
-      coneMeanXY << m_map[matchedConeIndex[i]].getOptX(),m_map[matchedConeIndex[i]].getOptY();
+      coneMeanXY << m_map[index].getOptX(),m_map[index].getOptY();
       g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
       coneVertex->setId(i);
       coneVertex->setEstimate(coneMeanXY);
@@ -332,7 +414,7 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       Eigen::Vector2d xyMeasurement;
       coneMeasurement->vertices()[0] = localGraph.vertex(1000);
       coneMeasurement->vertices()[1] = localGraph.vertex(i);
-      xyMeasurement << localObs[i](0),localObs[i](1);
+      xyMeasurement << localObs(0),localObs(1);
       coneMeasurement->setMeasurement(xyMeasurement);
 
       Eigen::Matrix2d informationMatrix;
@@ -343,21 +425,31 @@ void Slam::localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose){
       performedLocalization = true;
     }
   }
-    if(performedLocalization){
-      localGraph.initializeOptimization();
-      localGraph.optimize(10); 
-      g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(localGraph.vertex(1000));
-      g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
-      Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
+  if(performedLocalization){
+    localGraph.initializeOptimization();
+    localGraph.optimize(10); 
+    g2o::VertexSE2* updatedPoseVertex = static_cast<g2o::VertexSE2*>(localGraph.vertex(1000));
+    g2o::SE2 updatedPoseSE2 = updatedPoseVertex->estimate();
+    Eigen::Vector3d updatedPose = updatedPoseSE2.toVector();
+    std::lock_guard<std::mutex> lockSend(m_sendMutex);
+    m_sendPose << updatedPose(0),updatedPose(1),updatedPose(2);
+  }else{
+    std::lock_guard<std::mutex> lockSend(m_sendMutex);
+    m_sendPose << pose(0),pose(1),pose(2);
+  } 
+}
 
-      std::lock_guard<std::mutex> lockSend(m_sendMutex);
-      m_sendPose << updatedPose(0),updatedPose(1),updatedPose(2);
-    }else{
-      std::lock_guard<std::mutex> lockSend(m_sendMutex);
-      m_sendPose << pose(0),pose(1),pose(2);
-    }
-  
-  
+bool Slam::checkLocalization(){
+  double xOffset = m_sendPose(0) - m_odometryData(0);
+  double yOffset = m_sendPose(1) - m_odometryData(1);
+  double headingOffset = m_sendPose(2) - m_odometryData(2);
+  bool goodOffset = fabs(xOffset)<0.7 && fabs(yOffset)<0.7 && fabs(headingOffset)<0.4;
+  if(goodOffset){
+    m_xOffset = xOffset+m_xOffset;
+    m_yOffset = yOffset+m_yOffset;
+    m_headingOffset = headingOffset+m_headingOffset;
+  }
+  return goodOffset;
 }
 
 void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
@@ -435,7 +527,7 @@ void Slam::optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexE
   
   g2o::OptimizationAlgorithmGaussNewton* algorithmType = new g2o::OptimizationAlgorithmGaussNewton(g2o::make_unique<slamBlockSolver>(std::move(linearSolver)));
   essentialGraph.setAlgorithm(algorithmType); //Set optimizing method to Gauss Newton
-  essentialGraph.setVerbose(true);
+  //essentialGraph.setVerbose(true);
 
   std::vector<int> posesToGraph;
   //Find cones of conespan and extract poses
@@ -744,96 +836,6 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
   return recievedPoint;
 }
 
-double Slam::optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose){
-
-//Find surrounding cone indexes of 20 meters
-if(cones.cols() > 1){
-  double initPose = pose(2);
-  std::vector<uint32_t> inMapIndex;
-  for(uint32_t i = 0; i < m_map.size(); i++){
-    opendlv::logic::perception::ObjectDistance objDistance = m_map[i].getDistance(pose);
-    if(objDistance.distance() < 30){
-      inMapIndex.push_back(i);
-    }
-  }
-  double angle = pose(2)-PI/4;
-  
-  double angleMax = pose(2)+PI/4;
-  double degrees = 2;
-  double angleStep = 0.01745*degrees;
-
-  double bestHeading = 0;
-  double bestSumError = 100000;
-  uint32_t conesThatFits = 0;
-  std::vector<double> coneErrors;
-    for(double k = angle; k < angleMax; k = k + angleStep){
-      pose(2) = k;
-      double sumOfAllErrors = 0;
-      uint32_t lastConeFitter = 0;
-      bool foundFullMatch = false;
-      for(uint32_t i = 0; i < cones.cols(); i++){
-        Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
-        double minimumError = 100000;
-        
-        for(uint32_t j = 0; j < inMapIndex.size(); j++){
-        double errorDistance = std::sqrt( (globalCone(0)-m_map[inMapIndex[j]].getOptX())*(globalCone(0)-m_map[inMapIndex[j]].getOptX()) + (globalCone(1)-m_map[inMapIndex[j]].getOptY())*(globalCone(1)-m_map[inMapIndex[j]].getOptY()) );
-          if(errorDistance < minimumError){
-            minimumError = errorDistance;
-          }
-        }//Map
-        sumOfAllErrors += minimumError;
-        coneErrors.push_back(minimumError);        
-      }//Local Frame
-        bool betterSum = false;
-        if(sumOfAllErrors < bestSumError){
-          betterSum = true;
-          
-        }  
-          conesThatFits = 0;
-          for(uint32_t l = 0; l < coneErrors.size(); l++){
-            if(coneErrors[l] < 0.5){
-
-              conesThatFits++;
-            }
-          }
-
-          //CheckOutliers
-          
-
-
-
-          //std::cout << "Fitted Cones: " << conesThatFits << std::endl;
-          if(conesThatFits == cones.cols() && !foundFullMatch){
-              std::cout << "new Best Heading: " << k << std::endl;
-              std::cout << "best Error: " << sumOfAllErrors << std::endl;
-              bestHeading = k;
-              lastConeFitter = conesThatFits;
-              bestSumError = sumOfAllErrors;
-              foundFullMatch = true;
-          }else if(conesThatFits > 1 && conesThatFits >= lastConeFitter && betterSum){
-              std::cout << "new Best Heading: " << k << std::endl;
-              std::cout << "best Error: " << sumOfAllErrors << std::endl;
-              bestHeading = k;
-              lastConeFitter = conesThatFits;
-              bestSumError = sumOfAllErrors;
-            }
-                  
-          coneErrors.clear();
-  }  
-
-  double bestThreshold = 0.5*static_cast<double>(cones.cols());
-  if(bestSumError < bestThreshold && std::fabs(bestHeading - initPose) < 0.5){
-
-    return bestHeading;
-  }else{
-    return initPose;
-  }
-}
-
-  return pose(2);
-
-}
-
 void Slam::sendCones()
 {
   Eigen::Vector3d pose;
@@ -862,9 +864,9 @@ void Slam::sendCones()
 void Slam::sendPose(){
   opendlv::logic::sensation::Geolocation poseMessage;
   std::lock_guard<std::mutex> lockSend(m_sendMutex); 
-  poseMessage.longitude(m_sendPose(0));
-  poseMessage.latitude(m_sendPose(1));
-  poseMessage.heading(static_cast<float>(m_sendPose(2)));
+  poseMessage.longitude(m_sendPose(0)-m_xOffset);
+  poseMessage.latitude(m_sendPose(1)-m_yOffset);
+  poseMessage.heading(static_cast<float>(m_sendPose(2)-m_headingOffset));
   cluon::data::TimeStamp sampleTime = m_geolocationReceivedTime;
   od4.send(poseMessage, sampleTime ,m_senderStamp);
 }
@@ -879,29 +881,7 @@ double Slam::distanceBetweenConesOpt(Cone c1, Cone c2){
   double distance = std::sqrt( (c1.getOptX()-c2.getMeanX())*(c1.getOptX()-c2.getMeanX()) + (c1.getOptY()-c2.getMeanY())*(c1.getOptY()-c2.getMeanY()) );
   return distance;
 }
-/*
-void Slam::guessConeColor(){
-  std::vector<Cone> colorMap;
-  uint32_t currentConeIndex = 0;
-  for(uint32_t i = 0; i<m_poses.size(); i++){
-    Eigen::Vector3d pose = m_poses[i];
-    currentConeIndex = updateCurrentCone(pose,currentConeIndex,5);
-    Cone currentCone = m_map[currentConeIndex];
-    auto distance = currentCone.getDistance(pose);
-    auto direction = currentCone.getDirection(pose);
-    if(distance.distance() < 10.0f && fabs(direction.azimuthAngle())>80.0f){
-      if(direction.azimuthAngle()>0){
-        currentCone.setType(2);
-      }
-      else{
-        currentCone.setType(1);
-      }
-      colorMap.push_back(currentCone);
-      }
-    }
-    m_map = colorMap;
-}
-*/
+
 void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
   for(uint32_t i = start; i < end; i++){
 
@@ -964,37 +944,6 @@ void Slam::filterMap(){
     }
 
   }
-
-  //Check colours
-/*
-  for(uint32_t i = 0; i < m_coneList.size(); i++){
-    double distance = 10000;
-    double azimuth = 1000;
-    if(m_coneList[i].getType() == 0){
-      for(uint32_t j = 0; j < m_coneList[i].getObservations(); j++ ){
-        
-        Eigen::Vector2d localObs = m_coneList[i].getLocalConeObservation(j);
-        double localDistance = std::sqrt( localObs(0)*localObs(0) + localObs(1)*localObs(1) );
-        if(localDistance < distance){
-          distance = localDistance;
-          azimuth = std::atan2(localObs(1),localObs(0));
-        }
-      }
-
-
-      if(azimuth > 0.1 ){
-
-        m_coneList[i].setType(1);
-
-        //std::cout << "New type yellow" << std::endl;
-      }else if(azimuth < -0.1){
-        m_coneList[i].setType(2);
-        //std::cout << "New type blue" << std::endl;
-      }
-    }*/
-
-
-  //}
 }
 
 void Slam::setUp(std::map<std::string, std::string> configuration)
