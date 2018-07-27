@@ -38,6 +38,7 @@
 #include "opendlv-standard-message-set.hpp"
 
 #include "cone.hpp"
+#include "cvcones.hpp"
 
 
 class Slam {
@@ -66,6 +67,7 @@ public:
   Eigen::Vector3d drawCurrentUKFPose();
   std::vector<std::vector<int>> drawGraph();
   void recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
+  void recieveCombinedCvMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
   std::vector<std::vector<int>> getPermutations(int n);
   void initializeModule();
 
@@ -79,7 +81,7 @@ public:
   Eigen::Vector3d updatePoseFromGraph();
   void addPosesToGraph();
   void performSLAM(Eigen::MatrixXd Cones);
-  void localizer(Eigen::MatrixXd cones, Eigen::Vector3d pose);
+  void localizer(std::vector<std::pair<int,Eigen::Vector3d>>, Eigen::Vector3d pose);
   void createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose);
   void createFullGraph();
   void optimizeEssentialGraph(uint32_t graphIndexStart, uint32_t graphIndexEnd);
@@ -89,6 +91,7 @@ public:
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
+  Eigen::Vector3d Cartesian2Spherical(double x, double y, double z);
   void addConeMeasurements(int i);
   Eigen::Vector2d getConeToPoseMeasurement(int i, int j);
   Eigen::Vector2d getLocalConeToPoseMeasurement(Eigen::Vector3d pose, Eigen::Vector2d cone);
@@ -98,8 +101,14 @@ public:
   void updateMap(uint32_t start, uint32_t end, bool updateToGlobal);
   void filterMap();
   double optimizeHeading(Eigen::MatrixXd cones,Eigen::Vector3d pose);
+  std::vector<std::pair<int,Eigen::Vector3d>> matchCones(Eigen::MatrixXd cones,Eigen::Vector3d &pose);
+  std::pair<double,std::vector<uint32_t>> evaluatePose(Eigen::MatrixXd cones, Eigen::Vector3d pose, std::vector<uint32_t> inMapIndex, uint32_t &conesThatFit);
+  std::vector<std::pair<int,Eigen::Vector3d>> filterMatch(Eigen::MatrixXd cones, Eigen::Vector3d pose,std::pair<double,std::vector<uint32_t>> matchedCones);
+  bool localizable(std::vector<std::pair<int,Eigen::Vector3d>> matchedCones);
+  bool checkLocalization();
   void sendCones();
   void sendPose();
+  void SendCvCones(std::vector<Cone> cones);
   void writeToPoseAndMapFile();
 
 
@@ -109,6 +118,7 @@ public:
   g2o::SparseOptimizer m_optimizer;
   int32_t m_timeDiffMilliseconds = 110;
   cluon::data::TimeStamp m_lastTimeStamp;
+  cluon::data::TimeStamp m_lastCvTimeStamp;
   Eigen::MatrixXd m_coneCollector;
   uint32_t m_lastObjectId;
   std::mutex m_coneMutex;
@@ -133,6 +143,9 @@ public:
   int m_lapSize = 50;
   int m_poseId = 1000;
   int m_coneRef = 0;
+  double m_xOffset = 0;
+  double m_yOffset = 0;
+  double m_headingOffset = 0;
   uint32_t m_conesPerPacket = 20;
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
@@ -151,7 +164,8 @@ public:
   std::vector<Cone> m_coneList = {};
   bool m_filterMap = false;
   bool m_readyState = false;
-  bool m_readyStateMachine = false;
+  bool m_readyStateMachine = true;
+  CVCones m_cvCones;
   
     // Constants for degree transformation
   const double DEG2RAD = 0.017453292522222; // PI/180.0
