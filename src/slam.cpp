@@ -572,11 +572,9 @@ void Slam::createConnections(Eigen::MatrixXd cones, Eigen::Vector3d pose){
 
 void Slam::createFullGraph(){
   //Add all poses to graph
-  std::cout << "Add Poses To Graph ... " << std::endl;
   addPosesToGraph();
   //For each cone in conelist add poses
 
-  std::cout << "Add Cones To Graph ... " << std::endl;
   addConesToGraph();
 }
 
@@ -847,7 +845,6 @@ void Slam::addConesToGraph(){
     }else{
       coneMeanXY << m_coneList[i].getOptX(),m_coneList[i].getOptY();
     }
-    std::cout << "in Add Cones Main, conelist size: " << m_coneList.size() << std::endl;
     g2o::VertexPointXY* coneVertex = new g2o::VertexPointXY;
     coneVertex->setId(m_coneList[i].getId());
     coneVertex->setEstimate(coneMeanXY);
@@ -858,16 +855,12 @@ void Slam::addConesToGraph(){
 
 void Slam::addConeMeasurements(int i){
 
-
-  std::cout << "in Add Cones Measurements ..." << std::endl;
   g2o::EdgeSE2PointXY* coneMeasurement = new g2o::EdgeSE2PointXY;
   std::vector<int> connectedPoses = m_coneList[i].getConnectedPoses();
-  std::cout << "Connected Poses: " << connectedPoses.size() << std::endl;
 
   for(uint32_t j = 0; j < connectedPoses.size(); j++){
   Eigen::Vector2d xyMeasurement;
   xyMeasurement = getConeToPoseMeasurement(i,j);
-  std::cout << "xyMeasurements: " << xyMeasurement(0) << " | " << xyMeasurement(1) << " ||| " << "coneId" << m_coneList[i].getId() << std::endl;
   coneMeasurement->vertices()[0] = m_optimizer.vertex(connectedPoses[j]);
   coneMeasurement->vertices()[1] = m_optimizer.vertex(m_coneList[i].getId());
   coneMeasurement->setMeasurement(xyMeasurement);
