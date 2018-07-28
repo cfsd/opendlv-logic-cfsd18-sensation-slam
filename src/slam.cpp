@@ -422,11 +422,11 @@ int Slam::updateCurrentCone(Eigen::Vector3d pose,uint32_t currentConeIndex, uint
     Cone currentCone = m_map[i];
     auto distance = currentCone.getDistance(pose);
     auto direction = currentCone.getDirection(pose);
-    if(distance.distance() < 5.0f && fabs(direction.azimuthAngle())>80.0f){
-      if(distance.distance() < lastDistance.distance() )
-
-      lastDistance.distance(distance.distance());
-      currentConeIndex = i;
+    if(distance.distance() < 3.0f){
+      if(distance.distance() < lastDistance.distance()){
+        lastDistance.distance(distance.distance());
+        currentConeIndex = i;
+      }
     } 
   }
 
@@ -935,13 +935,6 @@ void Slam::sendCones()
   cluon::data::TimeStamp sampleTime = m_lastTimeStamp;
   for(uint32_t i = 0; i< m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
     int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
-    index = index - 2;
-    if(index > static_cast<int>(m_map.size())){
-      index = index-m_map.size();
-    }
-    if(index < 0){
-      index = m_map.size() - index;
-    }
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
     directionMsg.objectId(m_conesPerPacket-1-i);
     od4.send(directionMsg,sampleTime,m_senderStamp);
