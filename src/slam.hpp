@@ -138,6 +138,8 @@ public:
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
   double m_coneMappingThreshold = 67;
+  double m_offsetDistance = 0;
+  double m_offsetHeading = 0;
   uint32_t m_currentConeIndex = 0;
   int m_currentConeDiff = 0;
   int m_lapSize = 50;

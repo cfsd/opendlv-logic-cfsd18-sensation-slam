@@ -125,6 +125,10 @@ void Slam::nextPose(cluon::data::Envelope data){
     m_odometryData << WGS84Reading[0],
                       WGS84Reading[1],
                       odometry.heading();
+    double heading = odometry.heading()-PI;
+    heading = (heading > PI)?(heading-2*PI):(heading);
+    heading = (heading < -PI)?(heading+2*PI):(heading);
+    m_odometryData(2) = heading;
   }
   else{
     m_odometryData << longitude+m_xOffset,
@@ -162,13 +166,17 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
       auto direction = std::get<0>(it->second);
       auto distance = std::get<1>(it->second);
       auto type = std::get<2>(it->second);
-      cones(0,coneIndex) = direction.azimuthAngle();
-      cones(1,coneIndex) = direction.zenithAngle();
-      cones(2,coneIndex) = distance.distance();
-      cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
-      coneIndex++;
-      it++;
-    } 
+      double azimuth = direction.azimuthAngle();
+      if(fabs(azimuth)<90){
+        cones(0,coneIndex) = azimuth;
+        cones(1,coneIndex) = direction.zenithAngle();
+        cones(2,coneIndex) = distance.distance();
+        cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
+        coneIndex++;
+        it++;
+      }
+    }
+    cones = cones.topRows(coneIndex); 
     performSLAM(cones);
   }
 }
@@ -375,7 +383,8 @@ std::pair<double,std::vector<uint32_t>> Slam::evaluatePose(Eigen::MatrixXd cones
 std::vector<std::pair<int,Eigen::Vector3d>> Slam::filterMatch(Eigen::MatrixXd cones, Eigen::Vector3d pose,std::pair<double,std::vector<uint32_t>> matchedCones){
   std::vector<uint32_t> matchedIndices = std::get<1>(matchedCones);
   std::vector<std::pair<int,Eigen::Vector3d>> matchedConeVector;
-  double errorSum = std::get<0>(matchedCones);
+  //double errorSum = std::get<0>(matchedCones);
+  /*
   if(cones.cols() == 2 && errorSum/cones.cols() > 0.3){
     return matchedConeVector;
   }
@@ -384,12 +393,12 @@ std::vector<std::pair<int,Eigen::Vector3d>> Slam::filterMatch(Eigen::MatrixXd co
   }
   if(cones.cols() > 3 && errorSum/cones.cols() > 0.5){
     return matchedConeVector;
-  }
+  }*/
   for(int i = 0; i<cones.cols();i++){
     Eigen::Vector3d globalCone = coneToGlobal(pose, cones.col(i));
     Eigen::Vector3d localCone = Spherical2Cartesian(cones(0,i),cones(1,i),cones(2,i));
     double distance = std::sqrt( (globalCone(0)-m_map[matchedIndices[i]].getOptX())*(globalCone(0)-m_map[matchedIndices[i]].getOptX()) + (globalCone(1)-m_map[matchedIndices[i]].getOptY())*(globalCone(1)-m_map[matchedIndices[i]].getOptY()) );
-    if(distance<1.0){
+    if(distance<m_newConeThreshold){
       std::pair<int,Eigen::Vector3d> match = std::make_pair(matchedIndices[i],localCone);
       matchedConeVector.push_back(match);
     }
@@ -505,7 +514,7 @@ bool Slam::checkLocalization(){
   double xOffset = m_sendPose(0) - m_odometryData(0);
   double yOffset = m_sendPose(1) - m_odometryData(1);
   double headingOffset = m_sendPose(2) - m_odometryData(2);
-  bool goodOffset = fabs(xOffset)<0.7 && fabs(yOffset)<0.7 && fabs(headingOffset)<0.4;
+  bool goodOffset = fabs(xOffset)<m_offsetDistance && fabs(yOffset)<m_offsetDistance && fabs(headingOffset)<m_headingOffset;
   if(goodOffset){
     m_xOffset = xOffset+m_xOffset;
     m_yOffset = yOffset+m_yOffset;
@@ -1067,10 +1076,11 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   m_timeBetweenKeyframes = static_cast<double>(std::stod(configuration["timeBetweenKeyframes"]));
   m_coneMappingThreshold = static_cast<double>(std::stod(configuration["coneMappingThreshold"]));
   m_conesPerPacket = static_cast<int>(std::stoi(configuration["conesPerPacket"]));
+  m_offsetDistance = std::stod(configuration["offsetDistanceThreshold"]);
+  m_offsetHeading = std::stod(configuration["offsetHeadingThreshold"]);
   m_lapSize = std::stoi(configuration["lapSize"]);
   //std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
-
 }
 
 void Slam::initializeModule(){
@@ -1130,7 +1140,7 @@ void Slam::initializeModule(){
         lastHead = static_cast<float>(m_odometryData(2));  
         validHeadMeasurements++;
       }
-      if(validVelMeasurements > 30 && validHeadMeasurements > 30){
+      if(validVelMeasurements > 5 && validHeadMeasurements > 5){
         imuReadyState = true;
         std::cout << "IMU Ready .." << std::endl;
       }
