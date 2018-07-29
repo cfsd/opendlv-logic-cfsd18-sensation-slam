@@ -64,6 +64,8 @@ int32_t main(int32_t argc, char **argv) {
     cluon::data::Envelope data;
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
+
+    cluon::OD4Session od4Dan{static_cast<uint16_t>(std::stoi(commandlineArguments["cidDan"]))};
     Slam slam(commandlineArguments,od4);
     int gatheringTimeMs = (commandlineArguments.count("gatheringTimeMs")>0)?(std::stoi(commandlineArguments["gatheringTimeMs"])):(10);
     Collector collector(slam,gatheringTimeMs,2);
@@ -141,13 +143,20 @@ int32_t main(int32_t argc, char **argv) {
     // Just sleep as this microservice is data driven.
     using namespace std::literals::chrono_literals;
     bool readyState = false;
-    while (od4.isRunning()) {
+    while (od4.isRunning() && od4Dan.isRunning()) {
 
       if(readyState){
         opendlv::system::SignalStatusMessage ssm;
         ssm.code(1);
         cluon::data::TimeStamp sampleTime = cluon::time::now();
         od4.send(ssm, sampleTime ,slamStamp);
+
+        uint16_t mapsize = slam.getMapSize();
+        opendlv::proxy::SwitchStateReading mapSizeMessage;
+        mapSizeMessage.state(mapsize);
+        std::cout << "Map Size output:  " << mapSizeMessage.state() << std::endl;
+        od4Dan.send(mapSizeMessage, sampleTime ,1412);
+
       }else{
         slam.initializeModule();
         readyState = slam.getModuleState();

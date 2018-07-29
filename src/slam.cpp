@@ -1231,9 +1231,17 @@ void Slam::writeToPoseAndMapFile()
 		p.close();
 
 }
+
+uint16_t Slam::getMapSize(){
+
+  std::lock_guard<std::mutex> lockMap(m_mapMutex);
+  return static_cast<uint16_t>(m_coneList.size());
+}
 void Slam::tearDown()
 {
 }
 Slam::~Slam()
 {
 }
+
+//switchstatereading 1411 actual cones, 1412 total cones CID 219
