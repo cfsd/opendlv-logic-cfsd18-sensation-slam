@@ -70,6 +70,7 @@ public:
   void recieveCombinedCvMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame);
   std::vector<std::vector<int>> getPermutations(int n);
   void initializeModule();
+  uint16_t getMapSize();
 
  private:
   void setUp(std::map<std::string, std::string> commandlineArguments);
