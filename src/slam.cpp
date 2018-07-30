@@ -173,10 +173,10 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
         cones(2,coneIndex) = distance.distance();
         cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
         coneIndex++;
-        it++;
       }
+      it++;
     }
-    cones = cones.topRows(coneIndex); 
+    cones = cones.leftCols(coneIndex);
     performSLAM(cones);
   }
 }
@@ -276,6 +276,7 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     std::cout << "Localizing ..." << std::endl;
     std::vector<std::pair<int,Eigen::Vector3d>> matchedCones = matchCones(cones,pose); 
     if(localizable(matchedCones)){
+      std::cout << "matched " << matchedCones.size() << " cones" << std::endl;
       localizer(matchedCones,pose);
       if(checkLocalization()){
         sendPose();
@@ -514,7 +515,8 @@ bool Slam::checkLocalization(){
   double xOffset = m_sendPose(0) - m_odometryData(0);
   double yOffset = m_sendPose(1) - m_odometryData(1);
   double headingOffset = m_sendPose(2) - m_odometryData(2);
-  bool goodOffset = fabs(xOffset)<m_offsetDistance && fabs(yOffset)<m_offsetDistance && fabs(headingOffset)<m_headingOffset;
+  std::cout << "xoffset: " << xOffset << "yoffset: " << yOffset << "headingoffset: " << headingOffset << std::endl;
+  bool goodOffset = fabs(xOffset)<m_offsetDistance && fabs(yOffset)<m_offsetDistance && fabs(headingOffset)<m_offsetHeading;
   if(goodOffset){
     m_xOffset = xOffset+m_xOffset;
     m_yOffset = yOffset+m_yOffset;
@@ -1078,6 +1080,7 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   m_conesPerPacket = static_cast<int>(std::stoi(configuration["conesPerPacket"]));
   m_offsetDistance = std::stod(configuration["offsetDistanceThreshold"]);
   m_offsetHeading = std::stod(configuration["offsetHeadingThreshold"]);
+  std::cout << m_offsetDistance << m_offsetHeading << std::endl;
   m_lapSize = std::stoi(configuration["lapSize"]);
   //std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
