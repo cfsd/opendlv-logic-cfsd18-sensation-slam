@@ -176,8 +176,10 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
       }
       it++;
     }
-    cones = cones.leftCols(coneIndex);
-    performSLAM(cones);
+    //cones = cones.leftCols(coneIndex);
+    
+      performSLAM(cones);
+    
   }
 }
 void Slam::recieveCombinedCvMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
@@ -249,13 +251,25 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
   if(!m_loopClosingComplete){
     if(m_currentConeDiff > m_lapSize){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
+      
+      if(isMapValid(pose)){
+        std::cout << "Full BA ..." << std::endl;
+        fullBA();
 
-      std::cout << "Full BA ..." << std::endl;
-      fullBA();
-      m_loopClosingComplete = true;
-      m_filterMap = true;
+        std::cout << "Full BA Done ..." << std::endl;
+      }else{
+        m_currentConeIndex = 0;
+        m_poseId = 1000;
+        m_optimizer.clear();
+        m_poses.clear();
+        m_coneList.clear();
+        m_map.clear();
+        m_essentialMap.clear();
+        
 
-      std::cout << "Full BA Done ..." << std::endl;
+        std::cout << "Loop Closing Uncertain, Map Reset ..." << std::endl;
+
+      }
     }
   }
   //Map preprocessing
@@ -305,8 +319,8 @@ std::vector<std::pair<int,Eigen::Vector3d>> Slam::matchCones(Eigen::MatrixXd con
   if(std::get<0>(scoredMatch)/cones.cols()<1){
     return filterMatch(cones,pose,scoredMatch);
   }
-  double angle = pose(2)-PI/4;
-  double angleMax = pose(2)+PI/4;
+  double angle = pose(2)-PI/2;
+  double angleMax = pose(2)+PI/2;
   double degrees = 2;
   double angleStep = 0.01745*degrees;
   std::vector<std::pair<double,std::vector<uint32_t>>> matchVector;
@@ -774,12 +788,12 @@ void Slam::fullBA(){
   firstRobotPose->setFixed(true);
 
   /*g2o::VertexSE2* secondRobotPose = dynamic_cast<g2o::VertexSE2*>(m_optimizer.vertex(1001));
-  secondRobotPose->setFixed(true);
+  secondRobotPose->setFixed(true);*/
 
-  g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(0));
-  firstCone->setFixed(true);
+  /*g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(m_currentConeIndex));
+  firstCone->setFixed(true);*/
 
-  g2o::VertexPointXY* secondCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(1));
+  /*g2o::VertexPointXY* secondCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(1));
   secondCone->setFixed(true);*/
 
 
@@ -789,9 +803,14 @@ void Slam::fullBA(){
     m_optimizer.initializeOptimization();
     m_optimizer.optimize(10);
     std::cout << "Optimization Done ..." << std::endl;
-  }else{  
+    m_loopClosingComplete = true;
+    m_filterMap = true;
+  }else{
+    m_poseId = 1000;
+    m_currentConeIndex = 0;  
     m_optimizer.clear();
     m_map.clear();
+    m_essentialMap.clear();
     m_coneList.clear();
     m_poses.clear();
     std::cout << "Optimization not feasable, rebuilding graph ..." << std::endl;
@@ -1018,13 +1037,13 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
 void Slam::filterMap(){
 
   //Filter on mean and optimized value
-  for(uint32_t i = 0; i < m_coneList.size(); i++){
+  /*for(uint32_t i = 0; i < m_coneList.size(); i++){
     double distance = distanceBetweenConesOpt(m_coneList[i],m_coneList[i]);
     if(distance > m_newConeThreshold){
       m_coneList[i].setValidState(false);
 
     }
-  }
+  }*/
 
   for(uint32_t i = 0; i < m_coneList.size(); i++){
     for(uint32_t j = 0; j < m_coneList.size(); j++){
@@ -1157,6 +1176,29 @@ void Slam::initializeModule(){
   
   
 
+}
+
+bool Slam::isMapValid(Eigen::Vector3d pose){
+
+    uint32_t startPoseSet = 30;
+    //Check pose
+
+    Eigen::Vector2d lastLocalObs =  m_coneList[m_currentConeIndex].getLocalConeObservation(m_coneList[m_currentConeIndex].getObservations()-1);
+    Eigen::Vector2d loopClosingObs =  m_coneList[m_currentConeIndex].getLocalConeObservation(m_coneList[m_currentConeIndex].getObservations()-2);
+    double azLocal = std::atan2(lastLocalObs(1),lastLocalObs(0));
+    double azLoop = std::atan2(loopClosingObs(1),loopClosingObs(0));
+    
+    if(std::signbit(azLocal) == std::signbit(azLoop)){
+      for(uint32_t i = 0; i < startPoseSet; i++){
+
+        double distance = std::sqrt( (m_poses[i](0)-pose(0))*(m_poses[i](0)-pose(0)) + (m_poses[i](1)-pose(1))*(m_poses[i](1)-pose(1)) );
+        if(distance < m_newConeThreshold){
+          return true;
+        }
+      }
+    }
+    
+    return false;
 }
 void Slam::setStateMachineStatus(cluon::data::Envelope data){
   std::lock_guard<std::mutex> lockStateMachine(m_stateMachineMutex);

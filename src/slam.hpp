@@ -60,6 +60,7 @@ public:
   std::vector<Cone> drawCones();
   std::vector<Cone> drawRawCones();
   std::vector<Cone> drawLocalOptimizedCones();
+  bool isMapValid(Eigen::Vector3d pose);
   void setStateMachineStatus(cluon::data::Envelope data);
   bool getModuleState();
   std::vector<Eigen::Vector3d> drawPoses();
