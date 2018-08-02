@@ -76,6 +76,7 @@ int32_t main(int32_t argc, char **argv) {
     uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["estimationId"]));
     uint32_t slamStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["id"])); 
     uint32_t stateMachineStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["stateMachineId"]));
+    int coneCounter = 0;
 
     auto poseEnvelope{[&slammer = slam,senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
       {
@@ -85,8 +86,9 @@ int32_t main(int32_t argc, char **argv) {
       } 
     };
 
-    auto coneEnvelope{[&slammer = slam, cvStamp = detectconeCvStamp, attentionStamp = detectconeStamp,&collector,&collectorCv](cluon::data::Envelope &&envelope)
+    auto coneEnvelope{[&slammer = slam, cvStamp = detectconeCvStamp, attentionStamp = detectconeStamp,&collector,&collectorCv,&coneCounter](cluon::data::Envelope &&envelope)
       {
+        coneCounter++;
         if(envelope.senderStamp() == attentionStamp){
           collector.CollectCones(envelope);
           //slammer.nextCone(envelope);
@@ -143,6 +145,7 @@ int32_t main(int32_t argc, char **argv) {
     // Just sleep as this microservice is data driven.
     using namespace std::literals::chrono_literals;
     bool readyState = false;
+    int lastConeCounter = 0;
     while (od4.isRunning() && od4Dan.isRunning()) {
 
       if(readyState){
@@ -156,12 +159,15 @@ int32_t main(int32_t argc, char **argv) {
         mapSizeMessage.state(mapsize);
         std::cout << "Map Size output:  " << mapSizeMessage.state() << std::endl;
         od4Dan.send(mapSizeMessage, sampleTime ,1412);
-
+        if(coneCounter == lastConeCounter && coneCounter != 0){
+          slam.writeToPoseAndMapFile();
+        }
+        lastConeCounter = coneCounter;
       }else{
         slam.initializeModule();
         readyState = slam.getModuleState();
       }
-      std::this_thread::sleep_for(0.1s);
+      std::this_thread::sleep_for(1.0s);
       std::chrono::system_clock::time_point tp;
     }
   }

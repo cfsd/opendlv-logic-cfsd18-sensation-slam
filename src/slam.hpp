@@ -71,6 +71,7 @@ public:
   std::vector<std::vector<int>> getPermutations(int n);
   void initializeModule();
   uint16_t getMapSize();
+  void writeToPoseAndMapFile();
 
  private:
   void setUp(std::map<std::string, std::string> commandlineArguments);
@@ -169,6 +170,7 @@ public:
   bool m_readyState = false;
   bool m_readyStateMachine = true;
   CVCones m_cvCones;
+  std::vector<double> m_timeVector = {};
   
     // Constants for degree transformation
   const double DEG2RAD = 0.017453292522222; // PI/180.0

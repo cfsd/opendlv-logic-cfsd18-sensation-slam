@@ -156,7 +156,7 @@ void Slam::nextGroundSpeed(cluon::data::Envelope data){
 
 void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
   m_lastTimeStamp = currentFrameTime;
-
+  cluon::data::TimeStamp before = cluon::time::now();
   if(isKeyframe()){
     Eigen::MatrixXd cones = Eigen::MatrixXd::Zero(4,currentFrame.size());
     std::map<int,ConePackage>::iterator it;
@@ -167,17 +167,17 @@ void Slam::recieveCombinedMessage(cluon::data::TimeStamp currentFrameTime,std::m
       auto distance = std::get<1>(it->second);
       auto type = std::get<2>(it->second);
       double azimuth = direction.azimuthAngle();
-      if(fabs(azimuth)<90){
-        cones(0,coneIndex) = azimuth;
-        cones(1,coneIndex) = direction.zenithAngle();
-        cones(2,coneIndex) = distance.distance();
-        cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
-        coneIndex++;
-      }
+      cones(0,coneIndex) = azimuth;
+      cones(1,coneIndex) = direction.zenithAngle();
+      cones(2,coneIndex) = distance.distance();
+      cones(3,coneIndex) = (type.type()<=4)?(type.type()):(0);
+      coneIndex++;
       it++;
     }
-    cones = cones.leftCols(coneIndex);
     performSLAM(cones);
+    cluon::data::TimeStamp after = cluon::time::now();
+    double timeDiff = static_cast<double>(cluon::time::deltaInMicroseconds(after,before));
+    m_timeVector.push_back(timeDiff);
   }
 }
 void Slam::recieveCombinedCvMessage(cluon::data::TimeStamp currentFrameTime,std::map<int,ConePackage> currentFrame){
@@ -1214,7 +1214,7 @@ std::vector<std::vector<int>> Slam::drawGraph(){
 void Slam::writeToPoseAndMapFile()
 {
   std::string filepathMap;
-  filepathMap = "./map.txt";
+  filepathMap = "/opt/files/map.txt";
 	
 		std::ofstream f;
     	f.open(filepathMap.c_str());
@@ -1227,7 +1227,7 @@ void Slam::writeToPoseAndMapFile()
 
 
     std::string filepathPose;
-    filepathPose = "./pose.txt";
+    filepathPose = "/opt/files/pose.txt";
 		std::ofstream p;
     p.open(filepathPose.c_str());
 		for(uint32_t i = 0; i<m_poses.size(); i++){
@@ -1235,11 +1235,25 @@ void Slam::writeToPoseAndMapFile()
 				p << std::setprecision(9) << m_poses[i](0) << "\t" << m_poses[i](1) << "\t" << m_poses[i](2) << std::endl;
 		}
 		p.close();
-
+    std::string timePath = "/opt/files/time.txt";
+    p.open(timePath.c_str());
+ 		for(uint32_t i = 0; i<m_timeVector.size(); i++){
+			p << std::setprecision(4) << m_timeVector[i] << std::endl;
+		}
+    p.close();
+    std::string allObsFile = "/opt/files/obs.txt";
+    p.open(allObsFile.c_str());
+    for(uint32_t i = 0; i<m_map.size();i++){
+      Cone cone = m_map[i];
+      for(uint32_t j = 0; j<cone.getObservations(); j++){
+        Eigen::Vector3d obs = cone.getGlobalConeObservation(j);
+        p << std::setprecision(9) << i << "\t" << obs(0) << "\t" << obs(1) << std::endl;
+      }
+    }
+    p.close();
 }
 
 uint16_t Slam::getMapSize(){
-
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
   return static_cast<uint16_t>(m_coneList.size());
 }
