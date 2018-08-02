@@ -60,6 +60,7 @@ public:
   std::vector<Cone> drawCones();
   std::vector<Cone> drawRawCones();
   std::vector<Cone> drawLocalOptimizedCones();
+  void isMapValid(Eigen::Vector3d pose);
   void setStateMachineStatus(cluon::data::Envelope data);
   bool getModuleState();
   std::vector<Eigen::Vector3d> drawPoses();
@@ -93,6 +94,7 @@ public:
 
   Eigen::Vector2d transformConeToCoG(double angle, double distance);
   Eigen::Vector3d Spherical2Cartesian(double azimuth, double zenimuth, double distance);
+  Eigen::Vector3d Spherical2CartesianNoCoG(double azimuth, double zenimuth, double distance);
   Eigen::Vector3d Cartesian2Spherical(double x, double y, double z);
   void addConeMeasurements(int i);
   Eigen::Vector2d getConeToPoseMeasurement(int i, int j);
@@ -110,8 +112,7 @@ public:
   bool checkLocalization();
   void sendCones();
   void sendPose();
-  void SendCvCones(std::vector<Cone> cones);
-  void writeToPoseAndMapFile();
+  void SendCvCones(std::vector<Cone> cones,uint32_t conesToSend,cluon::data::TimeStamp sampleTimeIn);
 
 
 
@@ -171,6 +172,8 @@ public:
   bool m_readyStateMachine = true;
   CVCones m_cvCones;
   std::vector<double> m_timeVector = {};
+  bool m_mapIsValid = false;
+  uint32_t m_validMapIterator = 0;
   
     // Constants for degree transformation
   const double DEG2RAD = 0.017453292522222; // PI/180.0

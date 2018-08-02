@@ -247,15 +247,27 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
 
   //Check if there is enough loopclosing candidates
   if(!m_loopClosingComplete){
-    if(m_currentConeDiff > m_lapSize){
+    if(m_currentConeDiff > m_lapSize || m_validMapIterator > 0){
       std::lock_guard<std::mutex> lockMap(m_mapMutex);
+      isMapValid(pose);
+      if(m_mapIsValid){
+        std::cout << "Full BA ..." << std::endl;
+        fullBA();
 
-      std::cout << "Full BA ..." << std::endl;
-      fullBA();
-      m_loopClosingComplete = true;
-      m_filterMap = true;
+        std::cout << "Full BA Done ..." << std::endl;
+      }else if(m_validMapIterator > 19){
+        m_currentConeIndex = 0;
+        m_poseId = 1000;
+        m_optimizer.clear();
+        m_poses.clear();
+        m_coneList.clear();
+        m_map.clear();
+        m_essentialMap.clear();
+        m_validMapIterator = 0;
 
-      std::cout << "Full BA Done ..." << std::endl;
+        std::cout << "Loop Closing Uncertain, Map Reset ..." << std::endl;
+
+      }
     }
   }
   //Map preprocessing
@@ -286,7 +298,8 @@ void Slam::performSLAM(Eigen::MatrixXd cones){
     }
     m_sendPose = m_odometryData;
     //sendCones();
-    SendCvCones(m_cvCones.getCvCones());
+    std::vector<Cone> conesCv = m_cvCones.getCvCones(); 
+    SendCvCones(conesCv, conesCv.size(),m_lastCvTimeStamp );
   }
 }
 
@@ -305,8 +318,8 @@ std::vector<std::pair<int,Eigen::Vector3d>> Slam::matchCones(Eigen::MatrixXd con
   if(std::get<0>(scoredMatch)/cones.cols()<1){
     return filterMatch(cones,pose,scoredMatch);
   }
-  double angle = pose(2)-PI/4;
-  double angleMax = pose(2)+PI/4;
+  double angle = pose(2)-PI/2;
+  double angleMax = pose(2)+PI/2;
   double degrees = 2;
   double angleStep = 0.01745*degrees;
   std::vector<std::pair<double,std::vector<uint32_t>>> matchVector;
@@ -774,12 +787,12 @@ void Slam::fullBA(){
   firstRobotPose->setFixed(true);
 
   /*g2o::VertexSE2* secondRobotPose = dynamic_cast<g2o::VertexSE2*>(m_optimizer.vertex(1001));
-  secondRobotPose->setFixed(true);
+  secondRobotPose->setFixed(true);*/
 
-  g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(0));
-  firstCone->setFixed(true);
+  /*g2o::VertexPointXY* firstCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(m_currentConeIndex));
+  firstCone->setFixed(true);*/
 
-  g2o::VertexPointXY* secondCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(1));
+  /*g2o::VertexPointXY* secondCone = dynamic_cast<g2o::VertexPointXY*>(m_optimizer.vertex(1));
   secondCone->setFixed(true);*/
 
 
@@ -789,9 +802,14 @@ void Slam::fullBA(){
     m_optimizer.initializeOptimization();
     m_optimizer.optimize(10);
     std::cout << "Optimization Done ..." << std::endl;
-  }else{  
+    m_loopClosingComplete = true;
+    m_filterMap = true;
+  }else{
+    m_poseId = 1000;
+    m_currentConeIndex = 0;  
     m_optimizer.clear();
     m_map.clear();
+    m_essentialMap.clear();
     m_coneList.clear();
     m_poses.clear();
     std::cout << "Optimization not feasable, rebuilding graph ..." << std::endl;
@@ -919,7 +937,18 @@ Eigen::Vector3d Slam::Spherical2Cartesian(double azimuth, double zenimuth, doubl
                    zData;
   return recievedPoint;
 }
+Eigen::Vector3d Slam::Spherical2CartesianNoCoG(double azimuth, double zenimuth, double distance)
+{
 
+  double xData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*cos(azimuth * static_cast<double>(DEG2RAD));
+  double yData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*sin(azimuth * static_cast<double>(DEG2RAD));
+  double zData = distance * sin(zenimuth * static_cast<double>(DEG2RAD));
+  Eigen::MatrixXd recievedPoint = Eigen::Vector3d::Zero();
+  recievedPoint << xData,
+                   yData,
+                   zData;
+  return recievedPoint;
+}
 Eigen::Vector3d Slam::Cartesian2Spherical(double x, double y, double z)
 {
   double distance = sqrt(x*x+y*y+z*z);
@@ -943,20 +972,74 @@ void Slam::sendCones()
   }//mapmutex too
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
   //std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
+  std::vector<Cone> localFrame = m_cvCones.getCvCones();
+
   cluon::data::TimeStamp sampleTime = m_lastTimeStamp;
-  for(uint32_t i = 0; i< m_conesPerPacket;i++){ //Iterate through the cones ahead of time the path planning recieves
+  //SendCvCones(localFrame,m_conesPerPacket,sampleTime);
+  std::vector<uint32_t> globalIndex;
+  
+  for(uint32_t i = 0; i< m_conesPerPacket;i++){
+    bool isMatch = false; //Iterate through the cones ahead of time the path planning recieves
     int index = (m_currentConeIndex+i<m_map.size())?(m_currentConeIndex+i):(m_currentConeIndex+i-m_map.size()); //Check if more cones is sent than there exists
     opendlv::logic::perception::ObjectDirection directionMsg = m_map[index].getDirection(pose); //Extract cone direction
-    directionMsg.objectId(m_conesPerPacket-1-i);
-    od4.send(directionMsg,sampleTime,m_senderStamp);
     opendlv::logic::perception::ObjectDistance distanceMsg = m_map[index].getDistance(pose); //Extract cone distance
-    distanceMsg.objectId(m_conesPerPacket-1-i);
-    od4.send(distanceMsg,sampleTime,m_senderStamp);
-    opendlv::logic::perception::ObjectType typeMsg;
-    typeMsg.type(m_map[index].getType()); //Extract cone type
-    typeMsg.objectId(m_conesPerPacket-1-i);
-    od4.send(typeMsg,sampleTime,m_senderStamp);
+
+    Eigen::Vector3d currentGlobalCone = Spherical2CartesianNoCoG(static_cast<double>(directionMsg.azimuthAngle()),0.0,static_cast<double>(distanceMsg.distance()));
+    Cone currentMapCone = Cone(currentGlobalCone(0),currentGlobalCone(1),0,0);
+    for(uint32_t j = 0; j < localFrame.size(); j++){
+      //ToGlobal
+        if(distanceBetweenCones(currentMapCone,localFrame[j]) < 2 && localFrame[j].getType() != 0 ){
+          isMatch = true;
+          
+        }
+    }    
+
+    if(!isMatch){
+      globalIndex.push_back(index);
+    }
   }
+
+  uint32_t packetSize = globalIndex.size() + localFrame.size();
+  int i2 = 0;
+  for(uint32_t i = 0; i < packetSize; i++){
+
+          uint32_t index = packetSize-1-i;
+        if(i < localFrame.size()){
+
+          Eigen::Vector3d sphericalPoints = Cartesian2Spherical(localFrame[i].getX(),localFrame[i].getY(),0);
+          opendlv::logic::perception::ObjectDirection coneDirection;
+          coneDirection.objectId(index);
+          coneDirection.azimuthAngle(static_cast<float>(sphericalPoints(0)));  //Negative to convert to car frame from LIDAR
+          coneDirection.zenithAngle(static_cast<float>(sphericalPoints(1)));
+          od4.send(coneDirection,sampleTime,m_senderStamp);
+
+          opendlv::logic::perception::ObjectDistance coneDistance;
+          coneDistance.objectId(index);
+          coneDistance.distance(static_cast<float>(sphericalPoints(2)));
+          od4.send(coneDistance,sampleTime,m_senderStamp);
+
+          opendlv::logic::perception::ObjectType coneType;
+          coneType.objectId(index);
+          coneType.type(localFrame[i].getType());
+          od4.send(coneType,sampleTime,m_senderStamp);
+
+        }else{
+
+          int i3 = globalIndex[i2];
+          opendlv::logic::perception::ObjectDirection directionMsg = m_map[i3].getDirection(pose); //Extract cone direction
+          opendlv::logic::perception::ObjectDistance distanceMsg = m_map[i3].getDistance(pose); //Extract cone distance
+          directionMsg.objectId(index);
+          od4.send(directionMsg,sampleTime,m_senderStamp);
+          distanceMsg.objectId(index);
+          od4.send(distanceMsg,sampleTime,m_senderStamp);
+          opendlv::logic::perception::ObjectType typeMsg;
+          typeMsg.type(m_map[i3].getType()); //Extract cone type
+          typeMsg.objectId(index);
+          od4.send(typeMsg,sampleTime,m_senderStamp);
+          i2++;
+
+        }
+  }      
 }
 
 void Slam::sendPose(){
@@ -969,11 +1052,11 @@ void Slam::sendPose(){
   od4.send(poseMessage, sampleTime ,m_senderStamp);
 }
 
-void Slam::SendCvCones(std::vector<Cone> cones){
+void Slam::SendCvCones(std::vector<Cone> cones,uint32_t conesToSend,cluon::data::TimeStamp sampleTimeIn){
   std::cout << "Sending out cvCones .." << std::endl;
-  cluon::data::TimeStamp sampleTime = m_lastCvTimeStamp;
-  for(uint32_t i = 0; i < cones.size(); i++){
-    uint32_t index = cones.size()-1-i;
+  cluon::data::TimeStamp sampleTime = sampleTimeIn;
+  for(uint32_t i = 0; i < conesToSend; i++){
+    uint32_t index = conesToSend-1-i;
     Eigen::Vector3d sphericalPoints = Cartesian2Spherical(cones[index].getX(),cones[index].getY(),0);
     opendlv::logic::perception::ObjectDirection coneDirection;
     coneDirection.objectId(index);
@@ -1018,14 +1101,17 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
 void Slam::filterMap(){
 
   //Filter on mean and optimized value
-  for(uint32_t i = 0; i < m_coneList.size(); i++){
+  /*for(uint32_t i = 0; i < m_coneList.size(); i++){
     double distance = distanceBetweenConesOpt(m_coneList[i],m_coneList[i]);
     if(distance > m_newConeThreshold){
       m_coneList[i].setValidState(false);
 
     }
-  }
+  }*/
 
+
+
+  //Check for duplicates
   for(uint32_t i = 0; i < m_coneList.size(); i++){
     for(uint32_t j = 0; j < m_coneList.size(); j++){
       if(i != j){
@@ -1066,6 +1152,11 @@ void Slam::filterMap(){
     }
 
   }
+
+
+  //Evaluate if the map is good enough.
+
+
 }
 
 void Slam::setUp(std::map<std::string, std::string> configuration)
@@ -1158,6 +1249,35 @@ void Slam::initializeModule(){
   
 
 }
+
+void Slam::isMapValid(Eigen::Vector3d pose){
+
+    uint32_t startPoseSet = 30;
+    //Check pose
+
+    Eigen::Vector2d firstLocalObs =  m_coneList[m_currentConeIndex].getLocalConeObservation(0);
+    Eigen::Vector2d lastLocalObs =  m_coneList[m_currentConeIndex].getLocalConeObservation(m_coneList[m_currentConeIndex].getObservations()-2);
+    Eigen::Vector2d loopClosingObs =  m_coneList[m_currentConeIndex].getLocalConeObservation(m_coneList[m_currentConeIndex].getObservations()-1);
+    double azLocal = std::atan2(lastLocalObs(1),lastLocalObs(0));
+    double azLoop = std::atan2(loopClosingObs(1),loopClosingObs(0));
+    
+    if(std::signbit(azLocal) == std::signbit(azLoop)){
+      for(uint32_t i = 0; i < startPoseSet; i++){
+
+        double distance = std::sqrt( (m_poses[i](0)-pose(0))*(m_poses[i](0)-pose(0)) + (m_poses[i](1)-pose(1))*(m_poses[i](1)-pose(1)) );
+        if(distance < 1 ){
+          double localObsDistance = std::sqrt( (firstLocalObs(0)-loopClosingObs(0))*(firstLocalObs(0)-loopClosingObs(0)) + (firstLocalObs(1)-loopClosingObs(1))*(firstLocalObs(1)-loopClosingObs(1)) );
+          if(localObsDistance < 1){
+            m_mapIsValid = true;
+          }
+        }
+      }
+    }
+    if(!m_mapIsValid){
+      m_validMapIterator++;
+
+    }
+}
 void Slam::setStateMachineStatus(cluon::data::Envelope data){
   std::lock_guard<std::mutex> lockStateMachine(m_stateMachineMutex);
   auto machineStatus = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(data));
@@ -1246,7 +1366,7 @@ void Slam::writeToPoseAndMapFile()
     for(uint32_t i = 0; i<m_map.size();i++){
       Cone cone = m_map[i];
       for(uint32_t j = 0; j<cone.getObservations(); j++){
-        Eigen::Vector3d obs = cone.getGlobalConeObservation(j);
+        Eigen::Vector2d obs = cone.getGlobalConeObservation(j);
         p << std::setprecision(9) << i << "\t" << obs(0) << "\t" << obs(1) << std::endl;
       }
     }
