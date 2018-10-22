@@ -13,7 +13,7 @@ The architecture of SLAM system is supposed to summarize as front-end and back-e
  - opendlv.logic.perception.ObjectType
  - opendlv.logic.perception.ObjectDirection
  - opendlv.logic.perception.ObjectDistance
-+ Send
++Send
  - opendlv.logic.perception.ObjectType
  - opendlv.logic.perception.ObjectDirection
  - opendlv.logic.perception.ObjectDistance
