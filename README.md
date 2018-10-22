@@ -6,14 +6,14 @@ The architecture of SLAM system is supposed to summarize as front-end and back-e
 
 ## Input and Output
 ＋Recieve
- + opendlv.proxy.GeodeticWgs84Reading
- + opendlv.proxy.GeodeticHeadingReading
- + opendlv.logic.sensation.Geolocation
- + opendlv.proxy.AngularVelocityReading
- + opendlv.logic.perception.ObjectType
- + opendlv.logic.perception.ObjectDirection
- + opendlv.logic.perception.ObjectDistance
+ - opendlv.proxy.GeodeticWgs84Reading
+ - opendlv.proxy.GeodeticHeadingReading
+ - opendlv.logic.sensation.Geolocation
+ - opendlv.proxy.AngularVelocityReading
+ - opendlv.logic.perception.ObjectType
+ - opendlv.logic.perception.ObjectDirection
+ - opendlv.logic.perception.ObjectDistance
 + Send
- + opendlv.logic.perception.ObjectType
- + opendlv.logic.perception.ObjectDirection
- + opendlv.logic.perception.ObjectDistance
+ - opendlv.logic.perception.ObjectType
+ - opendlv.logic.perception.ObjectDirection
+ - opendlv.logic.perception.ObjectDistance
