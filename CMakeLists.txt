@@ -62,11 +62,10 @@ add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/cluon-msc
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/${CLUON_COMPLETE})
 
 ################################################################################
-# Generate opendlv-standard-message-set.{hpp,cpp} from ${OPENDLV_STANDARD_MESSAGE_SET} file.
-add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.cpp
+# Generate opendlv-standard-message-set.hpp from ${OPENDLV_STANDARD_MESSAGE_SET} file.
+add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMAND ${CMAKE_BINARY_DIR}/cluon-msc --cpp-sources --cpp-add-include-file=opendlv-standard-message-set.hpp --out=${CMAKE_BINARY_DIR}/opendlv-standard-message-set.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/${OPENDLV_STANDARD_MESSAGE_SET}
-    COMMAND ${CMAKE_BINARY_DIR}/cluon-msc --cpp-headers --out=${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp ${CMAKE_CURRENT_SOURCE_DIR}/src/${OPENDLV_STANDARD_MESSAGE_SET}
+    COMMAND ${CMAKE_BINARY_DIR}/cluon-msc --cpp --out=${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp ${CMAKE_CURRENT_SOURCE_DIR}/src/${OPENDLV_STANDARD_MESSAGE_SET}
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/${OPENDLV_STANDARD_MESSAGE_SET} ${CMAKE_BINARY_DIR}/cluon-msc)
 
 # Add current build directory as include directory as it contains generated files.
@@ -90,7 +89,11 @@ set(LIBRARIES Threads::Threads g2o_core g2o_solver_eigen g2o_types_slam2d g2o_st
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-add_library(${PROJECT_NAME}-core STATIC ${CMAKE_CURRENT_SOURCE_DIR}/src/slam.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/cone.cpp ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.cpp)
+add_library(${PROJECT_NAME}-core STATIC ${CMAKE_CURRENT_SOURCE_DIR}/src/slam.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/cone.cpp)
+
+# Add dependency to generate .hpp file
+add_custom_target(generate_opendlv_standard_message_set_hpp DEPENDS ${CMAKE_BINARY_DIR}/opendlv-standard-message-set.hpp)
+add_dependencies(${PROJECT_NAME}-core generate_opendlv_standard_message_set_hpp)
 
 ################################################################################
 # Create executable.
