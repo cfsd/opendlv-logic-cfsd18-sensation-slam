@@ -42,16 +42,16 @@ class Collector{
     void SendFrame();
 
   private:
-    cluon::data::TimeStamp m_currentFrameTime = {};
-    std::map<int,ConePackage> m_currentFrame = {}; 
-    std::map<int,int> m_envelopeCount = {};
-    bool m_newFrame = true;
-    bool m_processing = false;
-    uint32_t m_messageCount = 0;
-    Slam &m_module;
-    uint32_t m_packetSize;
-    int m_timeDiffMilliseconds;
-    uint32_t m_numberOfItems = 1;
+    cluon::data::TimeStamp m_currentFrameTime = {}; //Timestamp of current frame
+    std::map<int,ConePackage> m_currentFrame = {}; //Map containing the current cones with the Id as key
+    std::map<int,int> m_envelopeCount = {}; //Counter of received envelopes
+    bool m_newFrame = true; //Bool set to true if waiting for new frame
+    bool m_processing = false; //not used
+    uint32_t m_messageCount = 0; //number of cone envelopes received
+    Slam &m_module; //main module
+    uint32_t m_packetSize; //Constant given as input describing how big a cone packet is, it varies from module to module
+    int m_timeDiffMilliseconds; //The timeout parameter
+    uint32_t m_numberOfItems = 1; //How many cones you are expected to receive
 };
 
 #endif
