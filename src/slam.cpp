@@ -1227,7 +1227,11 @@ void Slam::setUp(std::map<std::string, std::string> configuration)
   //std::cout << "Cones per packet" << m_conesPerPacket << std::endl;
   m_senderStamp = static_cast<int>(std::stoi(configuration["id"]));
 }
-
+/*
+Checks if GPS and IMU data is ready, then sets SLAM module to ready.
+Special check for GPS is taht the xy-coordinates have to be < 200 meter from the set REFERENCE position in
+from the set input command
+*/
 void Slam::initializeModule(){
   //local Gps Vars
   double lastOdoX = 100000;
@@ -1300,7 +1304,12 @@ void Slam::initializeModule(){
   
 
 }
+/*-------------------THIS IS THE LOOP CLOSING POLICY------------------------
+This need some rework.
+Right now it checks that the first and last cone is matchable, they should have the same azimuth sign and minimum of one meter ecluidean distance error
 
+m_validMapiterator i iterator for each invalid loop closing try. if 19 failed loopclosings the map is reset, removing all poses and landmarks from the graph
+*/
 void Slam::isMapValid(Eigen::Vector3d pose){
 
     uint32_t startPoseSet = 30;
@@ -1337,13 +1346,14 @@ void Slam::setStateMachineStatus(cluon::data::Envelope data){
   if(state == 2){
     m_readyStateMachine = true;
   }
-/*Getters and methods used for the local pangolin UI*/
 }
 bool Slam::getModuleState(){
 
   return m_readyState;
 
 }
+
+/*Getters and methods used for the local pangolin UI*/
 std::vector<Eigen::Vector3d> Slam::drawPoses(){
   std::lock_guard<std::mutex> lockSensor(m_sensorMutex);
   return m_poses;
@@ -1410,7 +1420,9 @@ void Slam::writeToPoseAndMapFile()
 		p.close();
 
 }
-/*Gets the current map size to report the amount of cones seen, used for CAN logging by FSG*/
+/*Gets the current map size to report the amount of cones seen, used for CAN logging by FSG
+switchstatereading: 1411 actual cones, 1412 total cones CID 219
+*/
 uint16_t Slam::getMapSize(){
 
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
@@ -1423,4 +1435,3 @@ Slam::~Slam()
 {
 }
 
-//switchstatereading 1411 actual cones, 1412 total cones CID 219
