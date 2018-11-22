@@ -17,6 +17,10 @@
  * USA.
  */
 
+/*This is the class defining a cone object and its properties.
+It is an attempt at object-oriented programming and is a good example of how a state based module
+should be set up.*/
+
 #ifndef CONE_HPP
 #define CONE_HPP
 
@@ -65,19 +69,19 @@ class Cone{
   private:
     double m_x;
     double m_y;
-    int m_type;
-    int m_id;
+    int m_type; //Type of cone meaning the id of the color sent from detectcones CNN
+    int m_id; //id of the cone meaning the order it was discovered
     const double RAD2DEG = 57.295779513082325; // 1.0 / DEG2RAD;
-    std::vector<Eigen::Vector2d> m_observed = {};
-    std::vector<Eigen::Vector2d> m_localObserved = {};
-    double m_meanX = 0;
+    std::vector<Eigen::Vector2d> m_observed = {}; //Observed global positions
+    std::vector<Eigen::Vector2d> m_localObserved = {}; //Observed local positions
+    double m_meanX = 0; //mean of all observations
     double m_meanY = 0;
-    std::vector<int> m_connectedPoses = {};
-    bool m_optimizedState = false;
-    bool m_looperCandidate = false;
-    double m_optX = 0;
+    std::vector<int> m_connectedPoses = {}; //Connected pose Ids mainly used for plotting
+    bool m_optimizedState = false; //If a cone has been part of an optimization
+    bool m_looperCandidate = false; //IF a cone is a loop closer candidate
+    double m_optX = 0; // THe g2o optimized position
     double m_optY = 0;
-    bool m_validState = true;
+    bool m_validState = true; //If a cone is filtered from the map according to SLAM policy it is set to false and not used in the map
 };
 
 #endif
