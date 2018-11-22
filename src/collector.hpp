@@ -28,7 +28,10 @@
 #include "slam.hpp"
 #include "cvcones.hpp"
 #include "cluon-complete.hpp"
-
+/*The colliector class wraps the module and combines the received envelopes that are conetypes into one datastructure. 
+This is done since the envelopes in openDLV arrive in no particular order and therefore need to be combined to the cone structure 
+on the receiver side. This class is used in many modules to combine datastructures that need to be split into different envelopes.
+*/
 
 typedef std::tuple<opendlv::logic::perception::ObjectDirection,opendlv::logic::perception::ObjectDistance,opendlv::logic::perception::ObjectType> ConePackage;
 
