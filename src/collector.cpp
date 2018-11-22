@@ -18,28 +18,30 @@
 */
 
 #include "collector.hpp"
-
+/* Constructor taking the slam module object, 
+the wait time for the collection and the size of the packets as input*/
 Collector::Collector(Slam &slam,int timeDiffMilliseconds,int packetSize) : 
     m_module(slam),
     m_packetSize(packetSize),
     m_timeDiffMilliseconds(timeDiffMilliseconds)
 {
 }
-
+/*Method called for each envelope received by the module,
+Batches all envelopes related to cones and in the same frame into a map m_currentFrame*/
 void Collector::CollectCones(cluon::data::Envelope data){
     cluon::data::TimeStamp ts = data.sampleTimeStamp();
     int64_t delta = cluon::time::deltaInMicroseconds(ts,m_currentFrameTime);
-    if(std::abs(delta)<1){
+    if(std::abs(delta)<1){//If cones have the same timestamp they are in the same frame
         if(data.dataType() == opendlv::logic::perception::ObjectDirection::ID()){
             opendlv::logic::perception::ObjectDirection direction = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
             uint32_t id = direction.objectId();
             std::map<int,ConePackage>::iterator it;
             it = m_currentFrame.find(id);
-            if(it!=m_currentFrame.end()){
+            if(it!=m_currentFrame.end()){//If a cone is already in m_currentFrame add this message
                 std::get<0>(it->second) = direction;
                 m_envelopeCount[id]++;
             }
-            else{
+            else{//Make a new entry in the map using the objectId as key
                 ConePackage conePacket;
                 std::get<0>(conePacket) = direction;
                 m_currentFrame[id] = conePacket;
@@ -52,11 +54,11 @@ void Collector::CollectCones(cluon::data::Envelope data){
             uint32_t id = distance.objectId();
             std::map<int,ConePackage>::iterator it;
             it = m_currentFrame.find(id);
-            if(it!=m_currentFrame.end()){
+            if(it!=m_currentFrame.end()){//If a cone is already in m_currentFrame add this message
                 std::get<1>(it->second) = distance;
                 m_envelopeCount[id]++;
             }
-            else{
+            else{//Make a new entry in the map using the objectId as key
                 ConePackage conePacket;
                 std::get<1>(conePacket) = distance;
                 m_currentFrame[id] = conePacket;
@@ -69,11 +71,11 @@ void Collector::CollectCones(cluon::data::Envelope data){
             uint32_t id = type.objectId();
             std::map<int,ConePackage>::iterator it;
             it = m_currentFrame.find(id);
-            if(it!=m_currentFrame.end()){
+            if(it!=m_currentFrame.end()){//If a cone is already in m_currentFrame add this message
                 std::get<2>(it->second) = type;
                 m_envelopeCount[id]++;
             }
-            else{
+            else{//Make a new entry in the map using the objectId as key
                 ConePackage conePacket;
                 std::get<2>(conePacket) = type;
                 m_currentFrame[id] = conePacket;
@@ -84,7 +86,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
         m_messageCount++;
 
     }
-    else if(m_newFrame)
+    else if(m_newFrame) //If the message is the first of a new frame we reset the members
     {
         m_numberOfItems = 1;
         m_currentFrame.clear();
@@ -92,7 +94,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
         m_messageCount = 1;
         m_currentFrameTime = data.sampleTimeStamp();
         m_newFrame = false;
-        if(data.dataType() == opendlv::logic::perception::ObjectDirection::ID()){
+        if(data.dataType() == opendlv::logic::perception::ObjectDirection::ID()){//Add the message to the new frame
             opendlv::logic::perception::ObjectDirection direction = cluon::extractMessage<opendlv::logic::perception::ObjectDirection>(std::move(data));
             uint32_t id = direction.objectId();
             ConePackage conePacket;
@@ -101,7 +103,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
             m_envelopeCount[id]=1;
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }
-        else if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){
+        else if(data.dataType() == opendlv::logic::perception::ObjectDistance::ID()){//Add the message to the new frame
             opendlv::logic::perception::ObjectDistance distance = cluon::extractMessage<opendlv::logic::perception::ObjectDistance>(std::move(data));
             uint32_t id = distance.objectId();
             ConePackage conePacket;
@@ -110,7 +112,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
             m_envelopeCount[id]=1;
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }
-        else if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){
+        else if(data.dataType() == opendlv::logic::perception::ObjectType::ID()){//Add the message to the new frame
             opendlv::logic::perception::ObjectType type = cluon::extractMessage<opendlv::logic::perception::ObjectType>(std::move(data));
             uint32_t id = type.objectId();
             ConePackage conePacket;
@@ -119,7 +121,7 @@ void Collector::CollectCones(cluon::data::Envelope data){
             m_envelopeCount[id]=1;
             m_numberOfItems = (m_numberOfItems<=id)?(id+1):(m_numberOfItems);
         }        
-        std::thread coneCollector (&Collector::InitializeCollection,this); //just sleep instead maybe since this is unclear how it works
+        std::thread coneCollector (&Collector::InitializeCollection,this); //Create a collection thread that assembles the frame
         coneCollector.detach();
     }
     else{
@@ -127,16 +129,18 @@ void Collector::CollectCones(cluon::data::Envelope data){
     }
 
 }
-
+/*
+Method that gathers all the cone objects that can be assumed to belong to the same frame
+*/
 void Collector::InitializeCollection(){
 bool sleep = true;
 auto start = std::chrono::system_clock::now();
 
-  while(sleep)
+  while(sleep)//Wait for m_timeDiffMillisecond to gather the whole frame
   {
     auto now = std::chrono::system_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - start);
-    if(m_messageCount == m_numberOfItems*m_packetSize){
+    if(m_messageCount == m_numberOfItems*m_packetSize){//frame complete
         sleep = false;
     }
     if(elapsed.count() > m_timeDiffMilliseconds*1000){
@@ -148,7 +152,7 @@ auto start = std::chrono::system_clock::now();
   SendFrame();
   m_newFrame = true;
 }
-
+/*Removes any incomplete cone packets from the frame i.e. cones without all the 3 messages*/
 void Collector::GetCompleteFrame(){
     std::map<int,int>::iterator it2 = m_envelopeCount.begin();
     while(it2 != m_envelopeCount.end()){
@@ -160,8 +164,8 @@ void Collector::GetCompleteFrame(){
     }
 }
 
+/*Sends the complete frame to the SLAM module*/
 void Collector::SendFrame(){
-
     if(m_packetSize == 2){
         std::cout << "sending " << m_currentFrame.size() << " cones" << std::endl;
         m_module.recieveCombinedMessage(m_currentFrameTime,m_currentFrame);
