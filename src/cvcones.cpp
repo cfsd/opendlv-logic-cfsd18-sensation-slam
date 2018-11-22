@@ -26,7 +26,7 @@ m_stampMutex()
 {
 
 }
-
+/*Sets the last local frames from detectcone*/
 void CVCones::setCvCones(Eigen::MatrixXd cones){
 
   std::lock_guard<std::mutex> lockCone(m_coneMutex);
@@ -37,6 +37,7 @@ void CVCones::setCvCones(Eigen::MatrixXd cones){
     m_cones.push_back(cone);
   }
 }
+/*Getters and Setters*/
 std::vector<Cone> CVCones::getCvCones(){
 
   std::lock_guard<std::mutex> lockCone(m_coneMutex);
@@ -53,7 +54,7 @@ cluon::data::TimeStamp CVCones::getTimeStamp(){
   std::lock_guard<std::mutex> lockStamp(m_stampMutex);
   return m_lastTimeStamp;
 }
-
+/*Spherical2Cartesian conversion for matching to the map*/
 Eigen::Vector3d CVCones::Spherical2Cartesian(double azimuth, double zenimuth, double distance)
 {
   double xData = distance * cos(zenimuth * static_cast<double>(DEG2RAD))*cos(azimuth * static_cast<double>(DEG2RAD));
@@ -65,6 +66,7 @@ Eigen::Vector3d CVCones::Spherical2Cartesian(double azimuth, double zenimuth, do
                    zData;
   return recievedPoint;
 }
+/*Transforms the cone from the LIDAR frame to the COG frame*/
 Eigen::Vector2d CVCones::transformConeToCoG(double angle, double distance){
   const double lidarDistToCoG = 1.5;
   double sign = angle/std::fabs(angle);
