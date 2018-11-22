@@ -118,8 +118,8 @@ public:
 
   /*Member variables*/
   cluon::OD4Session &od4;
-  g2o::SparseOptimizer m_optimizer;
-  int32_t m_timeDiffMilliseconds = 110;
+  g2o::SparseOptimizer m_optimizer; //The GLOBAL graph that is used for loop closing. i.e all poses and essential-optimized cones
+  int32_t m_timeDiffMilliseconds = 110; //this is overridden by a input parameter
   cluon::data::TimeStamp m_lastTimeStamp;
   cluon::data::TimeStamp m_lastCvTimeStamp;
   Eigen::MatrixXd m_coneCollector;
@@ -133,25 +133,25 @@ public:
   std::mutex m_stateMachineMutex;
   Eigen::Vector3d m_odometryData;
   std::array<double,2> m_gpsReference;
-  std::vector<Cone> m_map;
-  std::vector<Cone> m_essentialMap = {};
-  std::vector<Eigen::Vector3d> m_poses = {};
-  std::vector<std::vector<int>> m_connectivityGraph = {};
-  double m_newConeThreshold= 1;
+  std::vector<Cone> m_map; //The full map
+  std::vector<Cone> m_essentialMap = {}; //The current essential map to be optimized, currently set to 10 cones per interval to be optimized
+  std::vector<Eigen::Vector3d> m_poses = {}; //Vector of all Poses!
+  std::vector<std::vector<int>> m_connectivityGraph = {};//Used to visualize the edges of the graph in the local visualizer
+  double m_newConeThreshold= 1; //The threshold where the a cone will be seen as a new cone and added to the map
   cluon::data::TimeStamp m_keyframeTimeStamp;
   double m_timeBetweenKeyframes = 0.5;
-  double m_coneMappingThreshold = 67;
+  double m_coneMappingThreshold = 67; 
   double m_offsetDistance = 0;
   double m_offsetHeading = 0;
   uint32_t m_currentConeIndex = 0;
   int m_currentConeDiff = 0;
-  int m_lapSize = 50;
-  int m_poseId = 1000;
+  int m_lapSize = 50; //VERY IMPORTANT ---- If the landmarks in the map is not exceeding 50 the SLAM wont do a full bundle adjustment
+  int m_poseId = 1000; //VERY IMPORTANT ---- In the graph the poses are set to vertexes with id > 1000, and cones with vertexes id < 1000. Assumption is that we wont see more than 1000 cones in a single run so the graph vertexes will not collide
   int m_coneRef = 0;
   double m_xOffset = 0;
   double m_yOffset = 0;
   double m_headingOffset = 0;
-  uint32_t m_conesPerPacket = 20;
+  uint32_t m_conesPerPacket = 20; // VERY IMPORTANT ---- This parameter is overrided by a input parameter, but this variable decides how many cones will be sent out by the SLAM to motion planning
   bool m_sendConeData = false;
   bool m_sendPoseData = false;
   bool m_newFrame;
