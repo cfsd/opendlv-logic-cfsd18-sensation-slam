@@ -46,7 +46,7 @@ void sendCones(std::vector<ConePackage> cones,cluon::OD4Session &od4, uint32_t c
   }
 }
 
-
+/*Main method for the module*/
 int32_t main(int32_t argc, char **argv) {
   int32_t retCode{0};
   std::map<std::string, std::string> commandlineArguments = cluon::getCommandlineArguments(argc, argv);
@@ -63,6 +63,7 @@ int32_t main(int32_t argc, char **argv) {
     // Interface to a running OpenDaVINCI session (ignoring any incoming Envelopes).
     cluon::data::Envelope data;
     //std::shared_ptr<Slam> slammer = std::shared_ptr<Slam>(new Slam(10));
+    /*parameter settings*/
     cluon::OD4Session od4{static_cast<uint16_t>(std::stoi(commandlineArguments["cid"]))};
 
     cluon::OD4Session od4Dan{static_cast<uint16_t>(std::stoi(commandlineArguments["cidDan"]))};
@@ -76,7 +77,7 @@ int32_t main(int32_t argc, char **argv) {
     uint32_t estimationStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["estimationId"]));
     uint32_t slamStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["id"])); 
     uint32_t stateMachineStamp = static_cast<uint32_t>(std::stoi(commandlineArguments["stateMachineId"]));
-
+    /*Lambda for pose*/
     auto poseEnvelope{[&slammer = slam,senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == senderStamp){
@@ -84,7 +85,7 @@ int32_t main(int32_t argc, char **argv) {
         }
       } 
     };
-
+    /*Lambda for receiving cones from detectcone*/
     auto coneEnvelope{[&slammer = slam, cvStamp = detectconeCvStamp, attentionStamp = detectconeStamp,&collector,&collectorCv](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == attentionStamp){
@@ -95,7 +96,7 @@ int32_t main(int32_t argc, char **argv) {
         }
       }
     };
-
+    /*Lambda for a split pose meaning not the geolocation message, NOT USED*/
     auto splitPoseEnvelope{[&slammer = slam, senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == senderStamp){
@@ -103,7 +104,7 @@ int32_t main(int32_t argc, char **argv) {
         }
       }
     };
-
+    /*Lambda for yawrate message*/
     auto yawRateEnvelope{[&slammer = slam, senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == senderStamp){
@@ -111,7 +112,7 @@ int32_t main(int32_t argc, char **argv) {
         }
       }
     };
-
+    /*Lambda for ground speed*/
     auto groundSpeedEnvelope{[&slammer = slam, senderStamp = estimationStamp](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == senderStamp){
@@ -120,7 +121,7 @@ int32_t main(int32_t argc, char **argv) {
       }
     };
 
-
+    /*Lambda for statemachine status from the statemachine*/
     auto stateMachineStatusEnvelope{[&slammer = slam, senderStamp = stateMachineStamp](cluon::data::Envelope &&envelope)
       {
         if(envelope.senderStamp() == senderStamp){
@@ -144,13 +145,13 @@ int32_t main(int32_t argc, char **argv) {
     using namespace std::literals::chrono_literals;
     bool readyState = false;
     while (od4.isRunning() && od4Dan.isRunning()) {
-
+      /*Heartbeats to heartbeat module, not used but heartbeats should be implemented*/
       if(readyState){
         opendlv::system::SignalStatusMessage ssm;
         ssm.code(1);
         cluon::data::TimeStamp sampleTime = cluon::time::now();
         od4.send(ssm, sampleTime ,slamStamp);
-
+        /*Mapsize for sending to CAN module, used for sending CAN  messages to FSG logger according to FSG 18 rules*/
         uint16_t mapsize = slam.getMapSize();
         opendlv::proxy::SwitchStateReading mapSizeMessage;
         mapSizeMessage.state(mapsize);
