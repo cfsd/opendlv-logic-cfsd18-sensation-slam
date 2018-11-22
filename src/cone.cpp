@@ -19,6 +19,7 @@
 
 #include "cone.hpp"
 
+/*Constructor of the cone object*/
 Cone::Cone(double x, double y,int type,int id):
   m_x()
 , m_y()
@@ -34,6 +35,7 @@ Cone::Cone(double x, double y,int type,int id):
   m_id = id;
 }
 
+/*Converts the current cone object into a Direction message*/
 opendlv::logic::perception::ObjectDirection Cone::getDirection(Eigen::Vector3d pose){
   double x = m_optX-pose(0);
   double y = m_optY-pose(1);
@@ -48,6 +50,7 @@ opendlv::logic::perception::ObjectDirection Cone::getDirection(Eigen::Vector3d p
   return direction;
 }
 
+/*Converts the current cone object into a Distance message*/
 opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pose){
   double x = m_optX-pose(0);
   double y = m_optY-pose(1);
@@ -56,6 +59,8 @@ opendlv::logic::perception::ObjectDistance Cone::getDistance(Eigen::Vector3d pos
   msgDistance.distance(static_cast<float>(distance));
   return msgDistance;
 }
+
+/*Getters and Setters*/
 double Cone::getOptX(){
 
   return m_optX;
@@ -107,6 +112,9 @@ void Cone::setType(int type){
 void Cone::setId(int id){
   m_id = id;
 }
+/*Adding an observation of the Cone into different lists of observations
+also checks for loop closing candidate
+THIS IS NOT A GOOD WAY TO DETECT LOOP CLOSURES*/
 void Cone::addObservation(Eigen::Vector3d localObservation,Eigen::Vector3d globalObservation,int i,int currConeId){
 
   Eigen::Vector2d newLocalObservation;
@@ -142,7 +150,7 @@ Eigen::Vector2d Cone::getGlobalConeObservation(int i){
 
   return m_observed[i];
 }
-
+/*Calculates mean global position of the cone*/
 void Cone::calculateMean(){
   uint32_t observations = m_observed.size();
   double x = 0;
@@ -156,9 +164,8 @@ void Cone::calculateMean(){
     m_meanY = y/observations;
   }
 }
-
+/*Calculates covariance of the cone using all observations*/
 Eigen::Vector2d Cone::getCovariance(){
-
   uint32_t observations = m_observed.size();
   if(observations > 1){
     double varX = 0;
