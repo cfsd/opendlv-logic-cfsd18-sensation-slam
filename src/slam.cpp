@@ -1007,7 +1007,8 @@ Eigen::Vector3d Slam::Cartesian2Spherical(double x, double y, double z)
 
 }
 /*Sends the relevant cones from the global map, converts first to a local frame and then to the message types before sending
-via the od4session*/
+via the od4session. The code here matches the local cvCones with the cones from the map to ensure consistency. This is a messy
+method and should be redone*/
 void Slam::sendCones()
 {
   Eigen::Vector3d pose;
@@ -1031,7 +1032,7 @@ void Slam::sendCones()
 
     Eigen::Vector3d currentGlobalCone = Spherical2CartesianNoCoG(static_cast<double>(directionMsg.azimuthAngle()),0.0,static_cast<double>(distanceMsg.distance()));
     Cone currentMapCone = Cone(currentGlobalCone(0),currentGlobalCone(1),0,0);
-    for(uint32_t j = 0; j < localFrame.size(); j++){
+    for(uint32_t j = 0; j < localFrame.size(); j++){//Checks the global map for matches to the local frmae
       //ToGlobal
         if(distanceBetweenCones(currentMapCone,localFrame[j]) < 2 && localFrame[j].getType() != 0 ){
           isMatch = true;
@@ -1039,7 +1040,7 @@ void Slam::sendCones()
         }
     }    
 
-    if(!isMatch){
+    if(!isMatch){//Cones that weren't in the local frame are added to the global indices
       globalIndex.push_back(index);
     }
   }
@@ -1049,7 +1050,7 @@ void Slam::sendCones()
   for(uint32_t i = 0; i < packetSize; i++){
 
           uint32_t index = packetSize-1-i;
-        if(i < localFrame.size()){
+        if(i < localFrame.size()){//IF it is a local frame
 
           Eigen::Vector3d sphericalPoints = Cartesian2Spherical(localFrame[i].getX(),localFrame[i].getY(),0);
           opendlv::logic::perception::ObjectDirection coneDirection;
@@ -1068,7 +1069,7 @@ void Slam::sendCones()
           coneType.type(localFrame[i].getType());
           od4.send(coneType,sampleTime,m_senderStamp);
 
-        }else{
+        }else{ //If it is from the global frame
 
           int i3 = globalIndex[i2];
           opendlv::logic::perception::ObjectDirection directionMsg = m_map[i3].getDirection(pose); //Extract cone direction
@@ -1086,7 +1087,7 @@ void Slam::sendCones()
         }
   }      
 }
-
+/*Sends the optimized pose from the localization, can be used as feedback to state estimation*/
 void Slam::sendPose(){
   opendlv::logic::sensation::Geolocation poseMessage;
   std::lock_guard<std::mutex> lockSend(m_sendMutex); 
@@ -1097,6 +1098,7 @@ void Slam::sendPose(){
   od4.send(poseMessage, sampleTime ,m_senderStamp);
 }
 
+/* If the localization fails we just feed the cones from detectcone to the path planner*/
 void Slam::SendCvCones(std::vector<Cone> cones,uint32_t conesToSend,cluon::data::TimeStamp sampleTimeIn){
   std::cout << "Sending out cvCones .." << std::endl;
   cluon::data::TimeStamp sampleTime = sampleTimeIn;
@@ -1120,18 +1122,20 @@ void Slam::SendCvCones(std::vector<Cone> cones,uint32_t conesToSend,cluon::data:
     od4.send(coneType,sampleTime,m_senderStamp);
   }
 }
-
+/*Calculates distance between two cones to determine if they are the same cones*/
 double Slam::distanceBetweenCones(Cone c1, Cone c2){
   c1.calculateMean();
   c2.calculateMean();
   double distance = std::sqrt( (c1.getMeanX()-c2.getMeanX())*(c1.getMeanX()-c2.getMeanX()) + (c1.getMeanY()-c2.getMeanY())*(c1.getMeanY()-c2.getMeanY()) );
   return distance;
 }
+/*Comparison with optimized cones instead of mean observation*/
 double Slam::distanceBetweenConesOpt(Cone c1, Cone c2){
   double distance = std::sqrt( (c1.getOptX()-c2.getMeanX())*(c1.getOptX()-c2.getMeanX()) + (c1.getOptY()-c2.getMeanY())*(c1.getOptY()-c2.getMeanY()) );
   return distance;
 }
 
+/*Updates the global map after an optimization, the essentialMap is mainly used for plotting*/
 void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
   for(uint32_t i = start; i < end; i++){
 
@@ -1142,7 +1146,8 @@ void Slam::updateMap(uint32_t start, uint32_t end, bool updateToGlobal){
     }
   }
 }
-
+/*Filters the map on a set of criteria such as duplicates and proximity of cones to the car from the closest pose, Also assigns colors 
+to the cones based on azimuth angle*/
 void Slam::filterMap(){
 
   //Filter on mean and optimized value
@@ -1185,6 +1190,7 @@ void Slam::filterMap(){
     if(closestPoseDistance > 4 || m_coneList[i].getObservations()<2){
       m_coneList[i].setValidState(false);
     }
+    //assigns color tp the cone list*/
     else{
       auto direction = m_coneList[i].getDirection(m_poses[closestPoseId]);
       if(direction.azimuthAngle()>0){
@@ -1203,7 +1209,7 @@ void Slam::filterMap(){
 
 
 }
-
+/*Assigns the parameters from the command line to member variables*/
 void Slam::setUp(std::map<std::string, std::string> configuration)
 {
 
@@ -1323,6 +1329,7 @@ void Slam::isMapValid(Eigen::Vector3d pose){
 
     }
 }
+
 void Slam::setStateMachineStatus(cluon::data::Envelope data){
   std::lock_guard<std::mutex> lockStateMachine(m_stateMachineMutex);
   auto machineStatus = cluon::extractMessage<opendlv::proxy::SwitchStateReading>(std::move(data));
@@ -1330,7 +1337,7 @@ void Slam::setStateMachineStatus(cluon::data::Envelope data){
   if(state == 2){
     m_readyStateMachine = true;
   }
-  
+/*Getters and methods used for the local pangolin UI*/
 }
 bool Slam::getModuleState(){
 
@@ -1376,6 +1383,7 @@ std::vector<std::vector<int>> Slam::drawGraph(){
   return m_connectivityGraph;
  
 }
+/*Used for extracting the map to a text file for debugging and analysis*/
 void Slam::writeToPoseAndMapFile()
 {
   std::string filepathMap;
@@ -1402,7 +1410,7 @@ void Slam::writeToPoseAndMapFile()
 		p.close();
 
 }
-
+/*Gets the current map size to report the amount of cones seen, used for CAN logging by FSG*/
 uint16_t Slam::getMapSize(){
 
   std::lock_guard<std::mutex> lockMap(m_mapMutex);
