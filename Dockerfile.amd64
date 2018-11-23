@@ -29,7 +29,10 @@ RUN apk update && \
 #Install libs
 WORKDIR /tmp
 RUN hg clone https://bitbucket.org/eigen/eigen && cd eigen && mkdir build && cd build && cmake .. && make -j4 install
-RUN git clone https://github.com/RainerKuemmerle/g2o && cd g2o && mkdir build && cd build && cmake -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF .. && make -j4 install
+RUN git clone https://github.com/RainerKuemmerle/g2o && cd g2o && \
+    # force cmake to find Eigen3 using the module form (by commenting out line 361 and 362 in CMakeLists.txt)
+    a=$(grep -n 'set(G2O_EIGEN3_EIGEN_TARGET Eigen3::Eigen)' CMakeLists.txt | awk -F ':' '{print $1}') && sed -i "$a,$(($a+1))"'s/^/#/g' CMakeLists.txt && \
+    mkdir build && cd build && cmake -DG2O_BUILD_APPS=OFF -DG2O_BUILD_EXAMPLES=OFF .. && make -j4 install
 
 #install Microservice
 ADD . /opt/sources
